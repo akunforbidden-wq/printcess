@@ -12,25 +12,33 @@
 <script type="module">
   import { initializeApp }       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
-           onSnapshot, serverTimestamp, query, orderBy }
+           onSnapshot, serverTimestamp, query, orderBy, enableIndexedDbPersistence }
                                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
   import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
                                  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-  // ⚠️ GANTI DENGAN KONFIGURASI FIREBASE ANDA
   const firebaseConfig = {
-  apiKey: "AIzaSyDMs3s0FtYQTXqf4D-3lf9j2Ms10O3j1uU",
-  authDomain: "testmode-fd793.firebaseapp.com",
-  projectId: "testmode-fd793",
-  storageBucket: "testmode-fd793.firebasestorage.app",
-  messagingSenderId: "918109847562",
-  appId: "1:918109847562:web:0f6db5c849a94235c35ff3",
-  measurementId: "G-G1HDFKMN02"
+    apiKey: "AIzaSyDMs3s0FtYQTXqf4D-3lf9j2Ms10O3j1uU",
+    authDomain: "testmode-fd793.firebaseapp.com",
+    projectId: "testmode-fd793",
+    storageBucket: "testmode-fd793.firebasestorage.app",
+    messagingSenderId: "918109847562",
+    appId: "1:918109847562:web:0f6db5c849a94235c35ff3",
+    measurementId: "G-G1HDFKMN02"
   };
 
   const app  = initializeApp(firebaseConfig);
   const db   = getFirestore(app);
   const auth = getAuth(app);
+
+  // Aktifkan offline persistence — data tidak hilang walau internet putus sebentar
+  enableIndexedDbPersistence(db).catch(err => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Offline persistence: multiple tabs open');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Offline persistence: browser tidak support');
+    }
+  });
 
   // Expose ke global JS
   window._db              = db;
@@ -48,6 +56,13 @@
   window._signOut         = signOut;
   window._onAuthStateChanged = onAuthStateChanged;
   window._firebaseReady   = true;
+
+  // ✅ FIX RACE CONDITION: jalankan semua callback yang sudah menunggu,
+  // LALU baru dispatch event (untuk listener yang belum terpasang)
+  if (window._firebaseCallbacks && window._firebaseCallbacks.length) {
+    window._firebaseCallbacks.forEach(fn => fn());
+    window._firebaseCallbacks = [];
+  }
   window.dispatchEvent(new Event('firebaseReady'));
 </script>
 
@@ -480,9 +495,9 @@ textarea.form-control { resize: vertical; min-height: 72px; }
 
   <!-- SETTINGS PAGE -->
   <div class="page" id="page-settings">
-    <div class="table-wrap" style="padding:24px;max-width:500px;">
+    <div class="table-wrap" style="padding:24px;max-width:540px;">
       <div class="section-title" style="margin-bottom:16px;">Informasi Aplikasi</div>
-      <div class="detail-item-row"><span class="detail-label">Versi</span><span>2.0.0 (Firebase Auth)</span></div>
+      <div class="detail-item-row"><span class="detail-label">Versi</span><span>2.1.0 (Firebase Auth)</span></div>
       <div class="detail-item-row"><span class="detail-label">Firebase Status</span><span id="settings-fb-status">Mengecek...</span></div>
       <div class="detail-item-row"><span class="detail-label">Login sebagai</span><span id="settings-email" style="font-size:12.5px;color:var(--muted);">—</span></div>
       <div class="detail-item-row"><span class="detail-label">Total Order</span><span id="settings-total">0</span></div>
@@ -490,7 +505,17 @@ textarea.form-control { resize: vertical; min-height: 72px; }
         <span class="detail-label">Nama Toko</span>
         <input class="form-control" id="store-name" value="Printcess Digital Printing" style="max-width:240px;padding:6px 10px;">
       </div>
-      <div style="margin-top:20px;">
+      <div style="margin-top:24px;padding:16px;background:#fef3c7;border:1px solid #f59e0b;border-radius:var(--r);">
+        <div style="font-weight:700;font-size:13px;color:#92400e;margin-bottom:8px;">⚠️ Jika tidak bisa simpan order:</div>
+        <div style="font-size:12.5px;color:#78350f;line-height:1.6;">
+          Buka <strong>Firebase Console</strong> → <strong>Firestore Database</strong> → tab <strong>Rules</strong>, lalu ubah isinya menjadi:<br>
+          <code style="display:block;margin:8px 0;padding:8px;background:#fff;border-radius:6px;font-size:11.5px;border:1px solid #f59e0b;">
+            rules_version = '2';<br>
+            service cloud.firestore {'{'}match /databases/{'{database}'}/documents {'{'}match /{'{'}document=**{'}'} {'{'}allow read, write: if request.auth != null;{'}'}{'}'}{'}'}</code>
+          Kemudian klik <strong>Publish</strong>.
+        </div>
+      </div>
+      <div style="margin-top:16px;">
         <button class="btn btn-ghost" style="color:#dc2626;border-color:#fca5a5;" onclick="doLogout()"><i class="ti ti-logout"></i> Keluar dari Akun</button>
       </div>
     </div>
@@ -623,13 +648,22 @@ let itemRowCount = 0;
 // ==============================
 function waitForFirebase() {
   return new Promise((resolve, reject) => {
+    // Jika sudah siap, langsung resolve
     if (window._firebaseReady && window._db && window._auth) return resolve();
-    let elapsed = 0;
-    const iv = setInterval(() => {
-      elapsed += 100;
-      if (window._firebaseReady && window._db && window._auth) { clearInterval(iv); resolve(); }
-      else if (elapsed > 8000) { clearInterval(iv); reject(new Error('Firebase timeout')); }
-    }, 100);
+    // Daftarkan ke antrian callback (untuk module script yang lambat)
+    if (!window._firebaseCallbacks) window._firebaseCallbacks = [];
+    let done = false;
+    const cb = () => { if (!done) { done = true; resolve(); } };
+    window._firebaseCallbacks.push(cb);
+    // Juga listen event sebagai fallback
+    window.addEventListener('firebaseReady', () => cb(), { once: true });
+    // Timeout 15 detik (lebih panjang untuk hosting lambat)
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        reject(new Error('Firebase timeout — periksa koneksi internet dan Firebase config'));
+      }
+    }, 15000);
   });
 }
 
@@ -701,18 +735,30 @@ async function doLogout() {
 }
 
 // Listen auth state — runs automatically on load
-window.addEventListener('firebaseReady', () => {
+// ✅ FIX: Gunakan waitForFirebase() bukan addEventListener langsung
+//    agar tidak miss event jika module script lebih cepat selesai
+waitForFirebase().then(() => {
   window._onAuthStateChanged(window._auth, (user) => {
     if (user) { _showApp(user); }
     else { _showLogin(); }
   });
+}).catch(err => {
+  console.error('Firebase gagal inisialisasi:', err);
+  // Tampilkan pesan error di halaman login
+  const errEl = document.getElementById('login-error');
+  const errMsg = document.getElementById('login-error-msg');
+  if (errEl && errMsg) {
+    errMsg.textContent = 'Koneksi ke server gagal. Periksa internet Anda lalu refresh halaman.';
+    errEl.classList.add('show');
+  }
 });
 
 // ==============================
 // FIRESTORE
 // ==============================
-function initFirestore() {
+async function initFirestore() {
   try {
+    await waitForFirebase();
     const db = window._db;
     const q = window._query(window._col(db, 'orders'), window._orderBy('createdAt', 'desc'));
     unsubscribe = window._onSnapshot(q, (snapshot) => {
@@ -721,8 +767,18 @@ function initFirestore() {
       updateAllViews();
       setFirebaseStatus(true);
       if (window._pendingStatusId) { showOrderStatusForConsumer(window._pendingStatusId); window._pendingStatusId = null; }
-    }, (err) => { console.error('Firestore error:', err); setFirebaseStatus(false); });
-  } catch(e) { console.error('Firestore init error:', e); setFirebaseStatus(false); }
+    }, (err) => {
+      console.error('Firestore snapshot error:', err);
+      setFirebaseStatus(false);
+      // Tampilkan pesan khusus jika error permission
+      if (err.code === 'permission-denied') {
+        toast('⚠️ Firestore Rules ditolak! Buka Firebase Console dan perbarui Security Rules.', 'error');
+      }
+    });
+  } catch(e) {
+    console.error('Firestore init error:', e);
+    setFirebaseStatus(false);
+  }
 }
 
 function setFirebaseStatus(connected) {
@@ -886,17 +942,17 @@ async function saveOrder() {
   saveBtn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Menyimpan...';
 
   try {
+    // Pastikan Firebase siap sebelum operasi tulis
+    await waitForFirebase();
+
     if (currentEditId) {
       await window._updateDoc(window._doc(window._db, 'orders', currentEditId), { ...data, updatedAt: window._serverTimestamp() });
       toast('Order berhasil diperbarui!', 'success');
       closeModal('modal-order');
     } else {
-      // 🔒 ID ACAK — gunakan crypto.randomUUID() agar tidak bisa ditebak
-      // Format: uuid-v4 standar, simpan sebagai Firestore document ID
       data.createdAt = window._serverTimestamp();
-      // Kita biarkan Firestore auto-generate ID (addDoc) — ini adalah UUID acak dari Firebase
       const docRef = await window._addDoc(window._col(window._db, 'orders'), data);
-      const newId = docRef.id; // Firestore ID sudah acak & tidak bisa ditebak
+      const newId = docRef.id;
 
       toast(`Order disimpan!`, 'success');
       document.getElementById('modal-order-title').textContent = 'Order Tersimpan ✓';
@@ -905,7 +961,6 @@ async function saveOrder() {
       currentEditId = newId;
       saveBtn.innerHTML = '<i class="ti ti-circle-check"></i> Tersimpan'; saveBtn.disabled = true;
 
-      // Tawaran kirim WA langsung setelah order baru dibuat
       const orderData = { ...data, id: newId };
       if (data.wa) {
         setTimeout(() => {
@@ -915,7 +970,18 @@ async function saveOrder() {
       }
     }
   } catch(e) {
-    console.error(e); toast('Gagal menyimpan. Cek koneksi & Firebase.', 'error');
+    console.error('saveOrder error:', e);
+    let msg = 'Gagal menyimpan. Cek koneksi & Firebase.';
+    // Deteksi error spesifik untuk membantu debugging
+    if (e.code === 'permission-denied' || (e.message && e.message.includes('permission'))) {
+      msg = '⚠️ Akses ditolak Firebase! Buka Firebase Console → Firestore → Rules, ubah ke: allow read, write: if request.auth != null;';
+    } else if (e.code === 'unavailable' || (e.message && e.message.includes('offline'))) {
+      msg = 'Tidak ada koneksi internet. Cek koneksi lalu coba lagi.';
+    } else if (e.code === 'unauthenticated') {
+      msg = 'Sesi login habis. Silakan login ulang.';
+      setTimeout(() => doLogout(), 1500);
+    }
+    toast(msg, 'error');
     saveBtn.disabled = false; saveBtn.innerHTML = '<i class="ti ti-device-floppy"></i> Simpan Order';
   }
 }
@@ -925,13 +991,21 @@ async function saveOrder() {
 // ==============================
 async function updateStatus(id, status) {
   try {
+    await waitForFirebase();
     await window._updateDoc(window._doc(window._db, 'orders', id), {
       status, updatedAt: window._serverTimestamp(),
       ...(status === 'diambil' ? { diambilAt: window._serverTimestamp() } : {})
     });
     toast('Status diperbarui!', 'success');
     closeModal('modal-detail');
-  } catch(e) { toast('Gagal update status.', 'error'); }
+  } catch(e) {
+    console.error('updateStatus error:', e);
+    if (e.code === 'permission-denied') {
+      toast('⚠️ Akses ditolak! Periksa Firestore Security Rules di Firebase Console.', 'error');
+    } else {
+      toast('Gagal update status. Cek koneksi internet.', 'error');
+    }
+  }
 }
 
 // ==============================
@@ -940,9 +1014,17 @@ async function updateStatus(id, status) {
 async function deleteOrder(id) {
   if (!confirm('Hapus order ini?')) return;
   try {
+    await waitForFirebase();
     await window._deleteDoc(window._doc(window._db, 'orders', id));
     toast('Order dihapus.', 'success'); closeModal('modal-detail');
-  } catch(e) { toast('Gagal menghapus.', 'error'); }
+  } catch(e) {
+    console.error('deleteOrder error:', e);
+    if (e.code === 'permission-denied') {
+      toast('⚠️ Akses ditolak! Periksa Firestore Security Rules.', 'error');
+    } else {
+      toast('Gagal menghapus. Cek koneksi internet.', 'error');
+    }
+  }
 }
 
 // ==============================
