@@ -3,41 +3,51 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PrintFlow — Manajemen Digital Printing</title>
+<title>Printcess Digital Printing — Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
- 
-<!-- ===== FIREBASE CONFIG ===== -->
+
+<!-- ===== FIREBASE (Auth + Firestore) ===== -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { initializeApp }       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+           onSnapshot, serverTimestamp, query, orderBy }
+                                 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+                                 from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   // ⚠️ GANTI DENGAN KONFIGURASI FIREBASE ANDA
   const firebaseConfig = {
-  apiKey: "AIzaSyBAsOwRFJCCoRGJZsxAjhEh4lTZHaOvjt4",
-  authDomain: "printflowprintcess.firebaseapp.com",
-  projectId: "printflowprintcess",
-  storageBucket: "printflowprintcess.firebasestorage.app",
-  messagingSenderId: "811033721706",
-  appId: "1:811033721706:web:251271e696dab20a6a8313",
-  measurementId: "G-1XGTXCC368"
+  apiKey: "AIzaSyDMs3s0FtYQTXqf4D-3lf9j2Ms10O3j1uU",
+  authDomain: "testmode-fd793.firebaseapp.com",
+  projectId: "testmode-fd793",
+  storageBucket: "testmode-fd793.firebasestorage.app",
+  messagingSenderId: "918109847562",
+  appId: "1:918109847562:web:0f6db5c849a94235c35ff3",
+  measurementId: "G-G1HDFKMN02"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  const app  = initializeApp(firebaseConfig);
+  const db   = getFirestore(app);
+  const auth = getAuth(app);
 
-  window._db = db;
-  window._col = collection;
-  window._doc = doc;
-  window._addDoc = addDoc;
-  window._updateDoc = updateDoc;
-  window._deleteDoc = deleteDoc;
-  window._onSnapshot = onSnapshot;
+  // Expose ke global JS
+  window._db              = db;
+  window._auth            = auth;
+  window._col             = collection;
+  window._doc             = doc;
+  window._addDoc          = addDoc;
+  window._updateDoc       = updateDoc;
+  window._deleteDoc       = deleteDoc;
+  window._onSnapshot      = onSnapshot;
   window._serverTimestamp = serverTimestamp;
-  window._query = query;
-  window._orderBy = orderBy;
-  window._firebaseReady = true;
+  window._query           = query;
+  window._orderBy         = orderBy;
+  window._signIn          = signInWithEmailAndPassword;
+  window._signOut         = signOut;
+  window._onAuthStateChanged = onAuthStateChanged;
+  window._firebaseReady   = true;
   window.dispatchEvent(new Event('firebaseReady'));
 </script>
 
@@ -64,791 +74,246 @@
   --sidebar: 220px;
 }
 
-body {
-  font-family: var(--font-body);
-  background: var(--paper);
-  color: var(--ink);
-  display: flex;
-  min-height: 100vh;
-  overflow-x: hidden;
+body { font-family: var(--font-body); background: var(--paper); color: var(--ink); display: flex; min-height: 100vh; overflow-x: hidden; }
+
+#app-content { display: none; flex: 1; flex-direction: row; width: 100%; min-height: 100vh; }
+
+/* ====== LOGIN OVERLAY ====== */
+#login-overlay {
+  position: fixed; inset: 0;
+  background: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; padding: 20px;
 }
+.login-card {
+  background: #fff; border-radius: 20px;
+  padding: 40px 36px; width: 100%; max-width: 380px;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.4); text-align: center;
+}
+.login-logo { font-family: var(--font-head); font-size: 28px; font-weight: 800; color: var(--ink); letter-spacing: -0.5px; margin-bottom: 4px; }
+.login-logo span { color: var(--accent); }
+.login-sub { font-size: 11px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 28px; }
+.login-lock-icon { width: 56px; height: 56px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; font-size: 26px; color: var(--accent); }
+.login-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.login-desc { font-size: 13px; color: var(--muted); margin-bottom: 24px; line-height: 1.5; }
+.login-input-wrap { position: relative; margin-bottom: 12px; }
+.login-icon-left { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--muted); pointer-events: none; }
+.login-toggle-btn { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 18px; color: var(--muted); padding: 4px; display: flex; align-items: center; justify-content: center; border-radius: 6px; transition: color 0.15s, background 0.15s; z-index: 2; }
+.login-toggle-btn:hover { color: var(--ink); background: var(--paper2); }
+.login-input { width: 100%; padding: 13px 46px 13px 44px; border: 1.5px solid var(--border); border-radius: 10px; font-family: var(--font-body); font-size: 14px; color: var(--ink); background: var(--paper); outline: none; transition: border 0.15s; }
+.login-input.single-icon { padding-left: 44px; padding-right: 14px; }
+.login-input:focus { border-color: var(--accent); }
+.login-input.error-shake { border-color: #dc2626; animation: shake 0.4s ease; }
+@keyframes shake { 0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)} }
+.login-btn { width: 100%; padding: 13px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-family: var(--font-body); font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.15s; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.login-btn:hover { background: #d63545; }
+.login-btn:disabled { background: #bbb; cursor: not-allowed; }
+.login-error { color: #dc2626; font-size: 12.5px; margin-top: 10px; display: none; }
+.login-error.show { display: block; }
+.login-footer { font-size: 11px; color: var(--muted); margin-top: 20px; opacity: 0.6; }
 
 /* ====== SIDEBAR ====== */
-#sidebar {
-  width: var(--sidebar);
-  min-height: 100vh;
-  background: var(--ink);
-  position: fixed;
-  left: 0; top: 0;
-  display: flex;
-  flex-direction: column;
-  z-index: 100;
-  transition: transform 0.3s;
-}
-
-.sidebar-logo {
-  padding: 24px 20px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.logo-mark {
-  font-family: var(--font-head);
-  font-size: 22px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: -0.5px;
-  line-height: 1;
-}
-
+#sidebar { width: var(--sidebar); min-height: 100vh; background: var(--ink); position: fixed; left: 0; top: 0; display: flex; flex-direction: column; z-index: 100; transition: transform 0.3s; }
+.sidebar-logo { padding: 24px 20px 16px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.logo-mark { font-family: var(--font-head); font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px; line-height: 1; }
 .logo-mark span { color: var(--accent); }
-
-.logo-sub {
-  font-size: 10px;
-  color: rgba(255,255,255,0.35);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-top: 4px;
-}
-
-.sidebar-nav {
-  flex: 1;
-  padding: 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: rgba(255,255,255,0.5);
-  font-size: 13.5px;
-  font-weight: 400;
-  transition: all 0.15s;
-  user-select: none;
-}
-
+.logo-sub { font-size: 10px; color: rgba(255,255,255,0.35); letter-spacing: 2px; text-transform: uppercase; margin-top: 4px; }
+.sidebar-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; }
+.nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; color: rgba(255,255,255,0.5); font-size: 13.5px; font-weight: 400; transition: all 0.15s; user-select: none; }
 .nav-item i { font-size: 17px; flex-shrink: 0; }
-
 .nav-item:hover { color: #fff; background: rgba(255,255,255,0.06); }
-
-.nav-item.active {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 500;
-}
-
-.nav-badge {
-  margin-left: auto;
-  background: var(--accent2);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 20px;
-  min-width: 20px;
-  text-align: center;
-}
-
-.sidebar-footer {
-  padding: 16px 20px;
-  border-top: 1px solid rgba(255,255,255,0.08);
-  font-size: 11px;
-  color: rgba(255,255,255,0.2);
-}
-
-.firebase-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.firebase-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: #ef4444;
-  transition: background 0.3s;
-}
-
+.nav-item.active { background: var(--accent); color: #fff; font-weight: 500; }
+.nav-badge { margin-left: auto; background: var(--accent2); color: #fff; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; min-width: 20px; text-align: center; }
+.sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; color: rgba(255,255,255,0.2); }
+.sidebar-user { font-size: 11px; color: rgba(255,255,255,0.4); padding: 0 20px 12px; word-break: break-all; }
+.firebase-status { display: flex; align-items: center; gap: 6px; }
+.firebase-dot { width: 6px; height: 6px; border-radius: 50%; background: #ef4444; transition: background 0.3s; }
 .firebase-dot.connected { background: var(--green); }
 
 /* ====== MAIN ====== */
-#main {
-  margin-left: var(--sidebar);
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ====== HEADER ====== */
-#topbar {
-  position: sticky;
-  top: 0;
-  background: rgba(255,252,245,0.92);
-  backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
-  padding: 0 28px;
-  height: 60px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  z-index: 50;
-}
-
-.topbar-title {
-  font-family: var(--font-head);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-}
-
-.topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+#main { margin-left: var(--sidebar); flex: 1; display: flex; flex-direction: column; }
+#topbar { position: sticky; top: 0; background: rgba(255,252,245,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); padding: 0 28px; height: 60px; display: flex; align-items: center; justify-content: space-between; z-index: 50; }
+.topbar-title { font-family: var(--font-head); font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
 
 /* ====== BUTTONS ====== */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 18px;
-  border-radius: 8px;
-  font-family: var(--font-body);
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-  border: none;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-}
-
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 8px; font-family: var(--font-body); font-size: 13.5px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; white-space: nowrap; }
+.btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: #d63545; }
-
-.btn-secondary {
-  background: var(--paper2);
-  color: var(--ink);
-  border: 1px solid var(--border);
-}
-
+.btn-secondary { background: var(--paper2); color: var(--ink); border: 1px solid var(--border); }
 .btn-secondary:hover { background: #ebe6dc; }
-
-.btn-ghost {
-  background: transparent;
-  color: var(--muted);
-  border: 1px solid var(--border);
-}
-
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
 .btn-ghost:hover { background: var(--paper2); color: var(--ink); }
-
-.btn-sm {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-.btn-icon {
-  padding: 8px;
-  border-radius: 8px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--muted);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  font-size: 17px;
-}
-
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+.btn-icon { width: 34px; height: 34px; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s; font-size: 17px; }
 .btn-icon:hover { background: var(--paper2); color: var(--ink); }
-
 .btn-danger { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
 .btn-danger:hover { background: #fecaca; }
+.btn-wa { background: #dcfce7; color: #166534; border-color: #86efac; }
+.btn-wa:hover { background: #bbf7d0; }
 
 /* ====== PAGES ====== */
 .page { display: none; padding: 28px; }
 .page.active { display: block; }
 
 /* ====== STATS ====== */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 14px;
-  margin-bottom: 28px;
-}
-
-.stat-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 18px 20px;
-  transition: transform 0.15s;
-}
-
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 20px; transition: transform 0.15s; }
 .stat-card:hover { transform: translateY(-2px); }
-
-.stat-label {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.stat-value {
-  font-family: var(--font-head);
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--ink);
-  line-height: 1;
-}
-
-.stat-icon {
-  float: right;
-  font-size: 24px;
-  opacity: 0.2;
-  margin-top: -4px;
-}
+.stat-label { font-size: 11px; font-weight: 500; letter-spacing: 0.8px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.stat-value { font-family: var(--font-head); font-size: 28px; font-weight: 700; color: var(--ink); line-height: 1; }
+.stat-icon { float: right; font-size: 24px; opacity: 0.2; margin-top: -4px; }
 
 /* ====== SECTION HEADER ====== */
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  font-family: var(--font-head);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-}
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.section-title { font-family: var(--font-head); font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
 
 /* ====== SEARCH BAR ====== */
-.search-wrap {
-  position: relative;
-  flex: 1;
-  max-width: 280px;
-}
-
-.search-wrap i {
-  position: absolute;
-  left: 11px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 16px;
-  color: var(--muted);
-  pointer-events: none;
-}
-
-.search-input {
-  width: 100%;
-  padding: 9px 12px 9px 36px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--font-body);
-  font-size: 13.5px;
-  background: var(--card);
-  color: var(--ink);
-  outline: none;
-  transition: border 0.15s;
-}
-
+.search-wrap { position: relative; flex: 1; max-width: 280px; }
+.search-wrap i { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 16px; color: var(--muted); pointer-events: none; }
+.search-input { width: 100%; padding: 9px 12px 9px 36px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-body); font-size: 13.5px; background: var(--card); color: var(--ink); outline: none; transition: border 0.15s; }
 .search-input:focus { border-color: var(--accent); }
 
 /* ====== TABLE ====== */
-.table-wrap {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  overflow: hidden;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-
-thead th {
-  padding: 12px 16px;
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.6px;
-  text-transform: uppercase;
-  color: var(--muted);
-  background: var(--paper2);
-  border-bottom: 1px solid var(--border);
-}
-
-tbody tr {
-  border-bottom: 1px solid var(--border);
-  transition: background 0.1s;
-}
-
+.table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead th { padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase; color: var(--muted); background: var(--paper2); border-bottom: 1px solid var(--border); }
+tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
 tbody tr:last-child { border-bottom: none; }
 tbody tr:hover { background: var(--paper); }
-
-tbody td {
-  padding: 13px 16px;
-  color: var(--ink);
-  vertical-align: middle;
-}
-
-.td-name {
-  font-weight: 500;
-}
+tbody td { padding: 13px 16px; color: var(--ink); vertical-align: middle; }
+.td-name { font-weight: 500; }
 
 /* ====== STATUS BADGES ====== */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-
+.badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 0.3px; }
 .badge-antri { background: #fef3c7; color: #92400e; }
 .badge-proses { background: #dbeafe; color: #1e40af; }
 .badge-selesai { background: #dcfce7; color: #166534; }
 .badge-diambil { background: #f3f4f6; color: #4b5563; }
-.badge-dot {
-  width: 5px; height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-}
+.badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 
 /* ====== MODAL ====== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15,14,23,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s;
-}
-
-.modal-overlay.open {
-  opacity: 1;
-  pointer-events: all;
-}
-
-.modal {
-  background: var(--card);
-  border-radius: 16px;
-  width: 560px;
-  max-width: 95vw;
-  max-height: 90vh;
-  overflow-y: auto;
-  transform: translateY(20px) scale(0.97);
-  transition: transform 0.2s;
-  box-shadow: 0 24px 60px rgba(15,14,23,0.2);
-}
-
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,14,23,0.5); display: flex; align-items: center; justify-content: center; z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+.modal { background: var(--card); border-radius: 16px; width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto; transform: translateY(20px) scale(0.97); transition: transform 0.2s; box-shadow: 0 24px 60px rgba(15,14,23,0.2); }
 .modal-overlay.open .modal { transform: translateY(0) scale(1); }
-
-.modal-header {
-  padding: 22px 24px 16px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-title {
-  font-family: var(--font-head);
-  font-size: 17px;
-  font-weight: 700;
-}
-
+.modal-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.modal-title { font-family: var(--font-head); font-size: 17px; font-weight: 700; }
 .modal-body { padding: 20px 24px; }
-.modal-footer {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 
 /* ====== FORM ====== */
 .form-group { margin-bottom: 16px; }
-
-.form-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-  margin-bottom: 6px;
-  letter-spacing: 0.3px;
-}
-
-.form-control {
-  width: 100%;
-  padding: 10px 13px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--font-body);
-  font-size: 13.5px;
-  color: var(--ink);
-  background: var(--card);
-  outline: none;
-  transition: border 0.15s;
-}
-
+.form-label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.3px; }
+.form-control { width: 100%; padding: 10px 13px; border: 1px solid var(--border); border-radius: 8px; font-family: var(--font-body); font-size: 13.5px; color: var(--ink); background: var(--card); outline: none; transition: border 0.15s; }
 .form-control:focus { border-color: var(--accent); }
-
 select.form-control { cursor: pointer; }
-
 textarea.form-control { resize: vertical; min-height: 72px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-/* ====== ITEM LIST IN ORDER ====== */
-.items-list {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-
-.item-row {
-  display: grid;
-  grid-template-columns: 1fr 80px 80px 32px;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  align-items: center;
-  background: var(--paper);
-}
-
+/* ====== ITEM LIST ====== */
+.items-list { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+.item-row { display: grid; grid-template-columns: 1fr 80px 80px 32px; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border); align-items: center; background: var(--paper); }
 .item-row:last-child { border-bottom: none; }
-
-.item-row input {
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-family: var(--font-body);
-  font-size: 12.5px;
-  color: var(--ink);
-  background: var(--card);
-  outline: none;
-  width: 100%;
-}
-
+.item-row input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-family: var(--font-body); font-size: 12.5px; color: var(--ink); background: var(--card); outline: none; width: 100%; }
 .item-row input:focus { border-color: var(--accent); }
-
-.item-del-btn {
-  background: none;
-  border: none;
-  color: #dc2626;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background 0.1s;
-}
-
+.item-del-btn { background: none; border: none; color: #dc2626; cursor: pointer; font-size: 16px; padding: 2px; display: flex; align-items: center; justify-content: center; border-radius: 4px; transition: background 0.1s; }
 .item-del-btn:hover { background: #fee2e2; }
+.item-header { display: grid; grid-template-columns: 1fr 80px 80px 32px; gap: 8px; padding: 6px 10px; background: var(--paper2); font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
 
-.item-header {
-  display: grid;
-  grid-template-columns: 1fr 80px 80px 32px;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--paper2);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  color: var(--muted);
-  border-bottom: 1px solid var(--border);
-}
-
-/* ====== KANBAN BOARD ====== */
-.kanban-wrap {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.kanban-col {
-  background: var(--paper2);
-  border-radius: var(--r);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-
-.kanban-header {
-  padding: 14px 16px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 3px solid transparent;
-}
-
+/* ====== KANBAN ====== */
+.kanban-wrap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: start; }
+.kanban-col { background: var(--paper2); border-radius: var(--r); border: 1px solid var(--border); overflow: hidden; }
+.kanban-header { padding: 14px 16px; font-size: 12px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid transparent; }
 .kh-antri { border-color: #f59e0b; color: #92400e; background: #fef3c7; }
 .kh-proses { border-color: #3b82f6; color: #1e40af; background: #dbeafe; }
 .kh-selesai { border-color: #22c55e; color: #166534; background: #dcfce7; }
 .kh-diambil { border-color: #6b7280; color: #374151; background: #f3f4f6; }
+.kanban-count { background: rgba(255,255,255,0.7); border-radius: 20px; padding: 2px 8px; font-size: 11px; }
+.kanban-body { padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 80px; }
+.kcard { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 4px rgba(15,14,23,0.05); }
+.kcard:hover { border-color: var(--accent); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(232,72,85,0.12); }
+.kcard-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; color: var(--ink); }
+.kcard-date { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.kcard-items { font-size: 11px; color: var(--muted); }
+.kcard-item-line { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.kcard-item-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.kcard-actions { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 
-.kanban-count {
-  background: rgba(255,255,255,0.7);
-  border-radius: 20px;
-  padding: 2px 8px;
-  font-size: 11px;
-}
-
-.kanban-body {
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-height: 80px;
-}
-
-.kcard {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-  box-shadow: 0 1px 4px rgba(15,14,23,0.05);
-}
-
-.kcard:hover {
-  border-color: var(--accent);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(232,72,85,0.12);
-}
-
-.kcard-name {
-  font-weight: 600;
-  font-size: 13px;
-  margin-bottom: 4px;
-  color: var(--ink);
-}
-
-.kcard-date {
-  font-size: 11px;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-
-.kcard-items {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-.kcard-item-line {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 3px;
-}
-
-.kcard-item-dot {
-  width: 3px; height: 3px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex-shrink: 0;
-}
-
-.kcard-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-}
-
-/* ====== PICKUP PAGE ====== */
-.pickup-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.pickup-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 16px 20px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  transition: all 0.15s;
-}
-
+/* ====== PICKUP ====== */
+.pickup-list { display: flex; flex-direction: column; gap: 10px; }
+.pickup-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 16px 20px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; transition: all 0.15s; }
 .pickup-card:hover { border-color: var(--teal); }
-
 .pickup-info { flex: 1; }
-
-.pickup-name {
-  font-weight: 600;
-  font-size: 15px;
-  margin-bottom: 3px;
-}
-
-.pickup-meta {
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
-
-.pickup-items {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.pickup-item-tag {
-  background: var(--paper2);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 3px 9px;
-  font-size: 11.5px;
-  color: var(--ink);
-}
-
-.pickup-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: flex-end;
-}
+.pickup-name { font-weight: 600; font-size: 15px; margin-bottom: 3px; }
+.pickup-meta { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.pickup-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.pickup-item-tag { background: var(--paper2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px; font-size: 11.5px; color: var(--ink); }
+.pickup-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 
 /* ====== EMPTY STATE ====== */
-.empty-state {
-  text-align: center;
-  padding: 48px 20px;
-  color: var(--muted);
-}
-
-.empty-state i {
-  font-size: 40px;
-  opacity: 0.3;
-  margin-bottom: 12px;
-  display: block;
-}
-
-.empty-state p {
-  font-size: 14px;
-}
+.empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
+.empty-state i { font-size: 40px; opacity: 0.3; margin-bottom: 12px; display: block; }
+.empty-state p { font-size: 14px; }
 
 /* ====== TOAST ====== */
-#toast-container {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 9999;
-}
-
-.toast {
-  background: var(--ink);
-  color: #fff;
-  padding: 12px 18px;
-  border-radius: 10px;
-  font-size: 13.5px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: toastIn 0.3s ease;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-}
-
+#toast-container { position: fixed; bottom: 24px; right: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+.toast { background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 13.5px; display: flex; align-items: center; gap: 8px; animation: toastIn 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
 .toast.success { background: #166534; }
 .toast.error { background: #991b1b; }
+@keyframes toastIn { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
 
-@keyframes toastIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* ====== MOBILE ====== */
+#menu-toggle { display: none; background: none; border: 1px solid var(--border); border-radius: 8px; padding: 8px; cursor: pointer; font-size: 20px; color: var(--ink); }
+.filter-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-btn { padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: all 0.15s; }
+.filter-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
 
-/* ====== MOBILE MENU ====== */
-#menu-toggle {
-  display: none;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px;
-  cursor: pointer;
-  font-size: 20px;
-  color: var(--ink);
-}
+/* ====== QR MODAL ====== */
+.qr-modal-wrap { text-align: center; padding: 8px 0 4px; }
+.qr-code-box { display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 2px solid var(--border); border-radius: 16px; padding: 20px; margin: 12px auto; box-shadow: 0 4px 20px rgba(15,14,23,0.08); }
+.qr-order-info { background: var(--paper2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; margin: 12px 0; text-align: left; }
+.qr-order-info .qr-nama { font-family: var(--font-head); font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.qr-order-info .qr-meta { font-size: 12px; color: var(--muted); }
+.qr-instruction { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+.qr-url-box { background: var(--paper2); border: 1px dashed var(--border); border-radius: 8px; padding: 10px 14px; font-size: 11.5px; color: var(--muted); word-break: break-all; margin: 10px 0; font-family: monospace; cursor: pointer; transition: background 0.15s; }
+.qr-url-box:hover { background: #ebe6dc; color: var(--ink); }
 
-/* ====== FILTER ROW ====== */
-.filter-row {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
+/* ====== STATUS STEPS ====== */
+.status-progress { display: flex; align-items: center; justify-content: space-between; margin: 20px 0 24px; position: relative; }
+.status-progress::before { content: ''; position: absolute; left: 0; right: 0; top: 18px; height: 2px; background: var(--border); z-index: 0; }
+.status-step { display: flex; flex-direction: column; align-items: center; gap: 6px; z-index: 1; flex: 1; }
+.status-step-dot { width: 36px; height: 36px; border-radius: 50%; background: var(--paper2); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 15px; color: var(--muted); transition: all 0.3s; }
+.status-step-dot.done { background: var(--green); border-color: var(--green); color: #fff; }
+.status-step-dot.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px rgba(232,72,85,0.15); }
+.status-step-label { font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: 0.3px; text-transform: uppercase; text-align: center; }
+.status-step-label.active { color: var(--accent); }
+.status-step-label.done { color: var(--green); }
+.status-icon-wrap { width: 72px; height: 72px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; font-size: 32px; }
+.status-icon-antri { background: #fef3c7; color: #d97706; }
+.status-icon-proses { background: #dbeafe; color: #2563eb; }
+.status-icon-selesai { background: #dcfce7; color: #16a34a; }
+.status-icon-diambil { background: #f3f4f6; color: #6b7280; }
 
-.filter-btn {
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--muted);
-  transition: all 0.15s;
-}
+.scan-area { background: var(--paper2); border: 2px dashed var(--border); border-radius: var(--r); padding: 32px 20px; text-align: center; margin-bottom: 16px; transition: border-color 0.2s; }
+.scan-area:hover { border-color: var(--accent); }
+.scan-area i { font-size: 48px; color: var(--muted); opacity: 0.4; margin-bottom: 12px; display: block; }
+.scan-area p { font-size: 13.5px; color: var(--muted); }
 
-.filter-btn.active {
-  background: var(--ink);
-  color: #fff;
-  border-color: var(--ink);
-}
+.detail-item-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.detail-item-row:last-child { border-bottom: none; }
+.detail-label { color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: 0.3px; }
 
-/* ====== PRINT LABEL ====== */
+/* ====== WA QR PREVIEW SECTION ====== */
+.wa-preview-box { background: #dcfce7; border: 1px solid #86efac; border-radius: 12px; padding: 16px; margin: 12px 0; }
+.wa-preview-box p { font-size: 12.5px; color: #166534; line-height: 1.7; white-space: pre-wrap; word-break: break-all; }
+.wa-preview-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; color: #15803d; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+
 @media print {
   #sidebar, #topbar, .no-print { display: none !important; }
   #main { margin-left: 0 !important; }
   .page { display: block !important; padding: 0 !important; }
 }
-
-/* ====== RESPONSIVE ====== */
 @media (max-width: 900px) {
   :root { --sidebar: 0px; }
   #sidebar { transform: translateX(-220px); width: 220px; }
@@ -857,489 +322,14 @@ textarea.form-control { resize: vertical; min-height: 72px; }
   #menu-toggle { display: flex; }
   .kanban-wrap { grid-template-columns: 1fr 1fr; }
 }
-
 @media (max-width: 580px) {
   .kanban-wrap { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
   .stats-grid { grid-template-columns: 1fr 1fr; }
 }
-
-/* ====== ANIMATION ====== */
-.page.active > * {
-  animation: fadeSlide 0.25s ease both;
-}
-
-@keyframes fadeSlide {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ====== DETAIL MODAL ITEMS ====== */
-.detail-item-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13.5px;
-}
-
-.detail-item-row:last-child { border-bottom: none; }
-
-.detail-label {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
-}
-
-/* ====== QR CODE MODAL ====== */
-.qr-modal-wrap {
-  text-align: center;
-  padding: 8px 0 4px;
-}
-
-.qr-code-box {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  border: 2px solid var(--border);
-  border-radius: 16px;
-  padding: 20px;
-  margin: 12px auto;
-  box-shadow: 0 4px 20px rgba(15,14,23,0.08);
-}
-
-.qr-code-box canvas,
-.qr-code-box img {
-  display: block !important;
-}
-
-.qr-order-info {
-  background: var(--paper2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 18px;
-  margin: 12px 0;
-  text-align: left;
-}
-
-.qr-order-info .qr-nama {
-  font-family: var(--font-head);
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 4px;
-}
-
-.qr-order-info .qr-meta {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.qr-instruction {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin-top: 8px;
-  line-height: 1.5;
-}
-
-.qr-url-box {
-  background: var(--paper2);
-  border: 1px dashed var(--border);
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 11.5px;
-  color: var(--muted);
-  word-break: break-all;
-  margin: 10px 0;
-  font-family: monospace;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.qr-url-box:hover { background: #ebe6dc; color: var(--ink); }
-
-/* ====== STATUS PAGE (Konsumen) ====== */
-#page-status {
-  display: none;
-}
-
-#page-status.active {
-  display: block;
-}
-
-.status-page-wrap {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 40px 20px;
-}
-
-.status-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(15,14,23,0.1);
-}
-
-.status-card-header {
-  padding: 24px 28px 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--ink);
-  color: #fff;
-}
-
-.status-card-header .brand {
-  font-family: var(--font-head);
-  font-size: 20px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  margin-bottom: 4px;
-}
-
-.status-card-header .brand span { color: var(--accent); }
-
-.status-card-header .subtitle {
-  font-size: 12px;
-  color: rgba(255,255,255,0.45);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.status-card-body {
-  padding: 24px 28px;
-}
-
-.status-hero {
-  text-align: center;
-  padding: 20px 0 24px;
-}
-
-.status-icon-wrap {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 14px;
-  font-size: 32px;
-}
-
-.status-icon-antri { background: #fef3c7; color: #d97706; }
-.status-icon-proses { background: #dbeafe; color: #2563eb; }
-.status-icon-selesai { background: #dcfce7; color: #16a34a; }
-.status-icon-diambil { background: #f3f4f6; color: #6b7280; }
-
-.status-hero-label {
-  font-family: var(--font-head);
-  font-size: 22px;
-  font-weight: 800;
-  margin-bottom: 6px;
-}
-
-.status-hero-desc {
-  font-size: 13.5px;
-  color: var(--muted);
-  line-height: 1.5;
-  max-width: 280px;
-  margin: 0 auto;
-}
-
-.status-info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 13.5px;
-}
-
-.status-info-row:last-child { border-bottom: none; }
-.status-info-label { color: var(--muted); font-size: 12px; font-weight: 500; }
-
-.status-progress {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 20px 0 24px;
-  position: relative;
-}
-
-.status-progress::before {
-  content: '';
-  position: absolute;
-  left: 0; right: 0;
-  top: 18px;
-  height: 2px;
-  background: var(--border);
-  z-index: 0;
-}
-
-.status-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  z-index: 1;
-  flex: 1;
-}
-
-.status-step-dot {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--paper2);
-  border: 2px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  color: var(--muted);
-  transition: all 0.3s;
-}
-
-.status-step-dot.done {
-  background: var(--green);
-  border-color: var(--green);
-  color: #fff;
-}
-
-.status-step-dot.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 0 0 4px rgba(232,72,85,0.15);
-}
-
-.status-step-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  text-align: center;
-}
-
-.status-step-label.active { color: var(--accent); }
-.status-step-label.done { color: var(--green); }
-
-/* Scan QR page in pickup */
-.scan-area {
-  background: var(--paper2);
-  border: 2px dashed var(--border);
-  border-radius: var(--r);
-  padding: 32px 20px;
-  text-align: center;
-  margin-bottom: 16px;
-  transition: border-color 0.2s;
-}
-
-.scan-area:hover { border-color: var(--accent); }
-.scan-area i { font-size: 48px; color: var(--muted); opacity: 0.4; margin-bottom: 12px; display: block; }
-.scan-area p { font-size: 13.5px; color: var(--muted); }
-
-/* Print QR styles */
-@media print {
-  #sidebar, #topbar, .no-print { display: none !important; }
-  #main { margin-left: 0 !important; }
-  .qr-print-area { display: block !important; }
-  .modal-overlay { position: static !important; background: none !important; opacity: 1 !important; pointer-events: all !important; }
-  .modal { box-shadow: none !important; max-height: none !important; }
-}
-
-.qr-print-area { display: none; }
-
-/* ====== NOTE TAG ====== */
-.config-note {
-  background: #fef3c7;
-  border: 1px solid #fcd34d;
-  border-radius: 10px;
-  padding: 14px 18px;
-  margin-bottom: 24px;
-  font-size: 13px;
-  color: #92400e;
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-.config-note i { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-
-/* ====== LOGIN OVERLAY ====== */
-#login-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 20px;
-}
-
-#login-overlay.hidden {
-  display: none;
-}
-
-.login-card {
-  background: #ffffff;
-  border-radius: 20px;
-  padding: 40px 36px;
-  width: 100%;
-  max-width: 380px;
-  box-shadow: 0 32px 80px rgba(0,0,0,0.4);
-  text-align: center;
-}
-
-.login-logo {
-  font-family: var(--font-head);
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--ink);
-  letter-spacing: -0.5px;
-  margin-bottom: 4px;
-}
-.login-logo span { color: var(--accent); }
-
-.login-sub {
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  margin-bottom: 28px;
-}
-
-.login-title {
-  font-family: var(--font-head);
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: var(--ink);
-}
-
-.login-desc {
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 24px;
-  line-height: 1.5;
-}
-
-.login-input-wrap {
-  position: relative;
-  margin-bottom: 12px;
-}
-
-.login-input-wrap i.login-icon-left {
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 18px;
-  color: var(--muted);
-  pointer-events: none;
-}
-
-.login-toggle-btn {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 18px;
-  color: var(--muted);
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: color 0.15s, background 0.15s;
-  z-index: 2;
-}
-
-.login-toggle-btn:hover {
-  color: var(--ink);
-  background: var(--paper2);
-}
-
-.login-input {
-  width: 100%;
-  padding: 13px 46px 13px 44px;
-  border: 1.5px solid var(--border);
-  border-radius: 10px;
-  font-family: var(--font-body);
-  font-size: 15px;
-  color: var(--ink);
-  background: var(--paper);
-  outline: none;
-  transition: border 0.15s;
-  letter-spacing: 1px;
-}
-
-.login-input:focus { border-color: var(--accent); }
-.login-input.error-shake { border-color: #dc2626; animation: shake 0.4s ease; }
-
-@keyframes shake {
-  0%,100% { transform: translateX(0); }
-  20% { transform: translateX(-8px); }
-  40% { transform: translateX(8px); }
-  60% { transform: translateX(-5px); }
-  80% { transform: translateX(5px); }
-}
-
-.login-btn {
-  width: 100%;
-  padding: 13px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-family: var(--font-body);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.login-btn:hover { background: #d63545; }
-
-.login-error {
-  color: #dc2626;
-  font-size: 12.5px;
-  margin-top: 10px;
-  display: none;
-}
-
-.login-error.show { display: block; }
-
-.login-lock-icon {
-  width: 56px;
-  height: 56px;
-  background: #fee2e2;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 20px;
-  font-size: 26px;
-  color: var(--accent);
-}
-
-.login-footer {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 20px;
-  opacity: 0.6;
-}
-
+.page.active > * { animation: fadeSlide 0.25s ease both; }
+@keyframes fadeSlide { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -1347,27 +337,24 @@ textarea.form-control { resize: vertical; min-height: 72px; }
 <!-- ===== LOGIN OVERLAY ===== -->
 <div id="login-overlay">
   <div class="login-card">
-    <div class="login-logo">Print<span>Flow</span></div>
+    <div class="login-logo">Print<span>cess</span></div>
     <div class="login-sub">Digital Printing</div>
-
-    <div class="login-lock-icon">
-      <i class="ti ti-lock"></i>
-    </div>
-
+    <div class="login-lock-icon"><i class="ti ti-lock"></i></div>
     <div class="login-title">Masuk ke Dashboard</div>
-    <div class="login-desc">Masukkan KEY akses untuk melanjutkan ke panel manajemen.</div>
+    <div class="login-desc">Masukkan email dan password akun admin Anda.</div>
 
     <div class="login-input-wrap">
+      <i class="ti ti-mail login-icon-left"></i>
+      <input class="login-input single-icon" id="login-email" type="email"
+        placeholder="Email admin..." autocomplete="email"
+        onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    </div>
+    <div class="login-input-wrap">
       <i class="ti ti-key login-icon-left"></i>
-      <input
-        class="login-input"
-        id="login-key-input"
-        type="password"
-        placeholder="Masukkan KEY akses..."
-        autocomplete="off"
-        onkeydown="if(event.key==='Enter') doLogin()"
-      >
-      <button class="login-toggle-btn" type="button" onclick="toggleKeyVisibility()" id="eye-btn" title="Tampilkan/sembunyikan KEY">
+      <input class="login-input" id="login-pass" type="password"
+        placeholder="Password..." autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="login-toggle-btn" type="button" onclick="togglePass()" title="Tampilkan/sembunyikan">
         <i class="ti ti-eye" id="eye-icon"></i>
       </button>
     </div>
@@ -1375,47 +362,35 @@ textarea.form-control { resize: vertical; min-height: 72px; }
     <button class="login-btn" id="btn-login" onclick="doLogin()">
       <i class="ti ti-login"></i> Masuk
     </button>
-
     <div class="login-error" id="login-error">
       <i class="ti ti-alert-circle" style="font-size:13px;vertical-align:-1px;"></i>
-      KEY salah. Coba lagi.
+      <span id="login-error-msg">Email atau password salah.</span>
     </div>
-
-    <div class="login-footer">
-      Area terbatas &mdash; hanya untuk pengelola toko
-    </div>
+    <div class="login-footer">Area terbatas &mdash; hanya untuk pengelola toko</div>
   </div>
 </div>
 
+<!-- ===== APP CONTENT ===== -->
+<div id="app-content">
 
-<!-- ===== SIDEBAR ===== -->
+<!-- SIDEBAR -->
 <nav id="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-mark">Print<span>Flow</span></div>
+    <div class="logo-mark">Print<span>cess</span></div>
     <div class="logo-sub">Digital Printing</div>
   </div>
   <div class="sidebar-nav">
-    <div class="nav-item active" data-page="dashboard">
-      <i class="ti ti-layout-dashboard"></i> Dashboard
-    </div>
-    <div class="nav-item" data-page="produksi">
-      <i class="ti ti-printer"></i> Board Produksi
-      <span class="nav-badge" id="badge-produksi">0</span>
-    </div>
-    <div class="nav-item" data-page="pengambilan">
-      <i class="ti ti-package"></i> Pengambilan
-      <span class="nav-badge" id="badge-pickup">0</span>
-    </div>
-    <div class="nav-item" data-page="riwayat">
-      <i class="ti ti-history"></i> Riwayat
-    </div>
-    <div class="nav-item" data-page="scan-qr">
-      <i class="ti ti-qrcode"></i> Scan QR Pickup
-    </div>
-    <div class="nav-item" data-page="settings">
-      <i class="ti ti-settings"></i> Pengaturan
+    <div class="nav-item active" data-page="dashboard"><i class="ti ti-layout-dashboard"></i> Dashboard</div>
+    <div class="nav-item" data-page="produksi"><i class="ti ti-printer"></i> Board Produksi<span class="nav-badge" id="badge-produksi">0</span></div>
+    <div class="nav-item" data-page="pengambilan"><i class="ti ti-package"></i> Pengambilan<span class="nav-badge" id="badge-pickup">0</span></div>
+    <div class="nav-item" data-page="riwayat"><i class="ti ti-history"></i> Riwayat</div>
+    <div class="nav-item" data-page="scan-qr"><i class="ti ti-qrcode"></i> Scan QR Pickup</div>
+    <div class="nav-item" data-page="settings"><i class="ti ti-settings"></i> Pengaturan</div>
+    <div class="nav-item" onclick="doLogout()" style="margin-top:auto;color:rgba(255,100,100,0.7);">
+      <i class="ti ti-logout"></i> Keluar
     </div>
   </div>
+  <div class="sidebar-user" id="sidebar-user-email"></div>
   <div class="sidebar-footer">
     <div class="firebase-status">
       <div class="firebase-dot" id="firebase-dot"></div>
@@ -1424,7 +399,7 @@ textarea.form-control { resize: vertical; min-height: 72px; }
   </div>
 </nav>
 
-<!-- ===== MAIN ===== -->
+<!-- MAIN -->
 <div id="main">
   <header id="topbar">
     <div style="display:flex;align-items:center;gap:12px;">
@@ -1438,54 +413,22 @@ textarea.form-control { resize: vertical; min-height: 72px; }
     </div>
   </header>
 
-  <!-- ===== DASHBOARD PAGE ===== -->
+  <!-- DASHBOARD PAGE -->
   <div class="page active" id="page-dashboard">
     <div class="stats-grid">
-      <div class="stat-card">
-        <i class="ti ti-file-invoice stat-icon"></i>
-        <div class="stat-label">Total Order</div>
-        <div class="stat-value" id="stat-total">0</div>
-      </div>
-      <div class="stat-card">
-        <i class="ti ti-loader stat-icon"></i>
-        <div class="stat-label">Dalam Proses</div>
-        <div class="stat-value" id="stat-proses">0</div>
-      </div>
-      <div class="stat-card">
-        <i class="ti ti-circle-check stat-icon"></i>
-        <div class="stat-label">Siap Diambil</div>
-        <div class="stat-value" id="stat-selesai">0</div>
-      </div>
-      <div class="stat-card">
-        <i class="ti ti-package-export stat-icon"></i>
-        <div class="stat-label">Sudah Diambil</div>
-        <div class="stat-value" id="stat-diambil">0</div>
-      </div>
+      <div class="stat-card"><i class="ti ti-file-invoice stat-icon"></i><div class="stat-label">Total Order</div><div class="stat-value" id="stat-total">0</div></div>
+      <div class="stat-card"><i class="ti ti-loader stat-icon"></i><div class="stat-label">Dalam Proses</div><div class="stat-value" id="stat-proses">0</div></div>
+      <div class="stat-card"><i class="ti ti-circle-check stat-icon"></i><div class="stat-label">Siap Diambil</div><div class="stat-value" id="stat-selesai">0</div></div>
+      <div class="stat-card"><i class="ti ti-package-export stat-icon"></i><div class="stat-label">Sudah Diambil</div><div class="stat-value" id="stat-diambil">0</div></div>
     </div>
-
-    <div class="section-header">
-      <div class="section-title">Order Terbaru</div>
-    </div>
+    <div class="section-header"><div class="section-title">Order Terbaru</div></div>
     <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>No. Order</th>
-            <th>Konsumen</th>
-            <th>Item</th>
-            <th>Tgl Order</th>
-            <th>Status</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody id="tbl-recent">
-          <tr><td colspan="5"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada order</p></div></td></tr>
-        </tbody>
-      </table>
+      <table><thead><tr><th>No. Order</th><th>Konsumen</th><th>Item</th><th>Tgl Order</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody id="tbl-recent"><tr><td colspan="6"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada order</p></div></td></tr></tbody></table>
     </div>
   </div>
 
-  <!-- ===== PRODUKSI PAGE ===== -->
+  <!-- PRODUKSI PAGE -->
   <div class="page" id="page-produksi">
     <div class="section-header" style="margin-bottom:20px;">
       <div class="search-wrap" style="max-width:300px;">
@@ -1496,108 +439,65 @@ textarea.form-control { resize: vertical; min-height: 72px; }
     <div class="kanban-wrap" id="kanban-board"></div>
   </div>
 
-  <!-- ===== PENGAMBILAN PAGE ===== -->
+  <!-- PENGAMBILAN PAGE -->
   <div class="page" id="page-pengambilan">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-      <div class="search-wrap">
-        <i class="ti ti-search"></i>
-        <input class="search-input" id="search-pickup" placeholder="Cari nama konsumen..." oninput="renderPickup()">
-      </div>
+      <div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" id="search-pickup" placeholder="Cari nama konsumen..." oninput="renderPickup()"></div>
     </div>
-    <div class="filter-row" id="filter-pickup">
-      <button class="filter-btn active" data-f="selesai" onclick="setPickupFilter('selesai',this)">Siap Diambil</button>
-      <button class="filter-btn" data-f="diambil" onclick="setPickupFilter('diambil',this)">Sudah Diambil</button>
-      <button class="filter-btn" data-f="all" onclick="setPickupFilter('all',this)">Semua</button>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setPickupFilter('selesai',this)">Siap Diambil</button>
+      <button class="filter-btn" onclick="setPickupFilter('diambil',this)">Sudah Diambil</button>
+      <button class="filter-btn" onclick="setPickupFilter('all',this)">Semua</button>
     </div>
     <div class="pickup-list" id="pickup-list"></div>
   </div>
 
-  <!-- ===== RIWAYAT PAGE ===== -->
+  <!-- RIWAYAT PAGE -->
   <div class="page" id="page-riwayat">
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-      <div class="search-wrap">
-        <i class="ti ti-search"></i>
-        <input class="search-input" id="search-riwayat" placeholder="Cari konsumen..." oninput="renderRiwayat()">
-      </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;">
+      <div class="search-wrap"><i class="ti ti-search"></i><input class="search-input" id="search-riwayat" placeholder="Cari konsumen..." oninput="renderRiwayat()"></div>
     </div>
     <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>No. Order</th>
-            <th>Konsumen</th>
-            <th>Item</th>
-            <th>Tgl Order</th>
-            <th>Status</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody id="tbl-riwayat">
-          <tr><td colspan="5"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada data</p></div></td></tr>
-        </tbody>
-      </table>
+      <table><thead><tr><th>No. Order</th><th>Konsumen</th><th>Item</th><th>Tgl Order</th><th>Status</th><th>Aksi</th></tr></thead>
+      <tbody id="tbl-riwayat"><tr><td colspan="6"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada data</p></div></td></tr></tbody></table>
     </div>
   </div>
 
-  <!-- ===== SCAN QR PAGE ===== -->
+  <!-- SCAN QR PAGE -->
   <div class="page" id="page-scan-qr">
     <div style="max-width:520px;margin:0 auto;">
       <div class="section-header" style="margin-bottom:20px;">
-        <div>
-          <div class="section-title">Scan QR Code Pengambilan</div>
-          <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">Masukkan ID order dari QR code, atau scan langsung</div>
-        </div>
+        <div><div class="section-title">Scan QR Code Pengambilan</div><div style="font-size:12.5px;color:var(--muted);margin-top:3px;">Masukkan ID order dari QR code, atau scan langsung</div></div>
       </div>
-
-      <div class="scan-area" id="qr-scanner-area">
-        <i class="ti ti-qrcode"></i>
-        <p>Kamera scanner akan aktif di sini</p>
-        <p style="font-size:12px;margin-top:6px;opacity:0.6;">atau masukkan ID order secara manual di bawah</p>
-      </div>
-
+      <div class="scan-area"><i class="ti ti-qrcode"></i><p>Kamera scanner akan aktif di sini</p><p style="font-size:12px;margin-top:6px;opacity:0.6;">atau masukkan ID order secara manual di bawah</p></div>
       <div style="display:flex;gap:10px;margin-bottom:16px;">
-        <input class="form-control" id="scan-manual-input" placeholder="No. Order (cth: PF-240603-AB12) atau ID order" style="flex:1;"
-          onkeydown="if(event.key==='Enter') processQRScan()">
-        <button class="btn btn-primary" onclick="processQRScan()">
-          <i class="ti ti-search"></i> Cek Status
-        </button>
+        <input class="form-control" id="scan-manual-input" placeholder="No. Order atau ID pesanan" style="flex:1;" onkeydown="if(event.key==='Enter')processQRScan()">
+        <button class="btn btn-primary" onclick="processQRScan()"><i class="ti ti-search"></i> Cek Status</button>
       </div>
-
       <div id="scan-result-wrap" style="display:none;"></div>
     </div>
   </div>
 
-  <!-- ===== SETTINGS PAGE ===== -->
+  <!-- SETTINGS PAGE -->
   <div class="page" id="page-settings">
-    <div class="config-note">
-      <i class="ti ti-alert-triangle"></i>
-      <div>
-        <strong>Konfigurasi Firebase diperlukan.</strong> Buka file HTML ini dengan editor teks, cari bagian <code>firebaseConfig</code> di bagian atas, lalu isi dengan konfigurasi Firebase project Anda. Buat project di <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a> → Firestore Database.
-      </div>
-    </div>
-    <div class="table-wrap" style="padding:24px;">
+    <div class="table-wrap" style="padding:24px;max-width:500px;">
       <div class="section-title" style="margin-bottom:16px;">Informasi Aplikasi</div>
-      <div class="detail-item-row">
-        <span class="detail-label">Versi</span>
-        <span>1.0.0</span>
-      </div>
-      <div class="detail-item-row">
-        <span class="detail-label">Firebase Status</span>
-        <span id="settings-fb-status">Mengecek...</span>
-      </div>
-      <div class="detail-item-row">
-        <span class="detail-label">Total Order</span>
-        <span id="settings-total">0</span>
-      </div>
+      <div class="detail-item-row"><span class="detail-label">Versi</span><span>2.0.0 (Firebase Auth)</span></div>
+      <div class="detail-item-row"><span class="detail-label">Firebase Status</span><span id="settings-fb-status">Mengecek...</span></div>
+      <div class="detail-item-row"><span class="detail-label">Login sebagai</span><span id="settings-email" style="font-size:12.5px;color:var(--muted);">—</span></div>
+      <div class="detail-item-row"><span class="detail-label">Total Order</span><span id="settings-total">0</span></div>
       <div class="detail-item-row">
         <span class="detail-label">Nama Toko</span>
-        <input class="form-control" id="store-name" value="Digital Printing Saya" style="max-width:240px;padding:6px 10px;">
+        <input class="form-control" id="store-name" value="Printcess Digital Printing" style="max-width:240px;padding:6px 10px;">
+      </div>
+      <div style="margin-top:20px;">
+        <button class="btn btn-ghost" style="color:#dc2626;border-color:#fca5a5;" onclick="doLogout()"><i class="ti ti-logout"></i> Keluar dari Akun</button>
       </div>
     </div>
   </div>
-</div>
+</div><!-- /#main -->
 
-<!-- ===== MODAL ORDER ===== -->
+<!-- MODAL ORDER -->
 <div class="modal-overlay" id="modal-order">
   <div class="modal">
     <div class="modal-header">
@@ -1606,10 +506,10 @@ textarea.form-control { resize: vertical; min-height: 72px; }
     </div>
     <div class="modal-body">
       <div class="form-group" id="order-id-display-wrap" style="display:none;">
-        <label class="form-label">No. Order</label>
+        <label class="form-label">No. Order (ID Sistem)</label>
         <div style="display:flex;align-items:center;gap:8px;">
-          <input class="form-control" id="f-order-no" readonly style="background:var(--paper2);color:var(--muted);font-family:monospace;font-size:13px;letter-spacing:0.5px;">
-          <button type="button" class="btn btn-ghost btn-sm" onclick="copyOrderNo()" title="Salin No. Order" style="flex-shrink:0;"><i class="ti ti-copy"></i></button>
+          <input class="form-control" id="f-order-no" readonly style="background:var(--paper2);color:var(--muted);font-family:monospace;font-size:12px;letter-spacing:0.5px;">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="copyOrderNo()" title="Salin"><i class="ti ti-copy"></i></button>
         </div>
       </div>
       <div class="form-row">
@@ -1619,7 +519,7 @@ textarea.form-control { resize: vertical; min-height: 72px; }
         </div>
         <div class="form-group">
           <label class="form-label">No. WhatsApp</label>
-          <input class="form-control" id="f-wa" placeholder="cth: 08123456789">
+          <input class="form-control" id="f-wa" placeholder="cth: 08123456789" type="tel">
         </div>
       </div>
       <div class="form-group">
@@ -1629,13 +529,9 @@ textarea.form-control { resize: vertical; min-height: 72px; }
       <div class="form-group">
         <label class="form-label">Daftar Item <span style="color:var(--muted);font-weight:400;">(bisa lebih dari satu)</span></label>
         <div class="items-list" id="items-container">
-          <div class="item-header">
-            <span>Nama Barang</span><span>Qty</span><span>Satuan</span><span></span>
-          </div>
+          <div class="item-header"><span>Nama Barang</span><span>Qty</span><span>Satuan</span><span></span></div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="addItemRow()" style="margin-top:8px;">
-          <i class="ti ti-plus"></i> Tambah Item
-        </button>
+        <button class="btn btn-ghost btn-sm" onclick="addItemRow()" style="margin-top:8px;"><i class="ti ti-plus"></i> Tambah Item</button>
       </div>
       <div class="form-group">
         <label class="form-label">Catatan</label>
@@ -1644,14 +540,12 @@ textarea.form-control { resize: vertical; min-height: 72px; }
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-order')">Batal</button>
-      <button class="btn btn-primary" onclick="saveOrder()">
-        <i class="ti ti-device-floppy"></i> Simpan Order
-      </button>
+      <button class="btn btn-primary" id="btn-save-order" onclick="saveOrder()"><i class="ti ti-device-floppy"></i> Simpan Order</button>
     </div>
   </div>
 </div>
 
-<!-- ===== MODAL DETAIL ===== -->
+<!-- MODAL DETAIL -->
 <div class="modal-overlay" id="modal-detail">
   <div class="modal">
     <div class="modal-header">
@@ -1663,11 +557,11 @@ textarea.form-control { resize: vertical; min-height: 72px; }
   </div>
 </div>
 
-<!-- ===== MODAL QR CODE ===== -->
+<!-- MODAL QR CODE (dengan tombol Kirim WA + QR) -->
 <div class="modal-overlay" id="modal-qr">
-  <div class="modal" style="max-width:400px;">
+  <div class="modal" style="max-width:440px;">
     <div class="modal-header">
-      <div class="modal-title">QR Code Pesanan</div>
+      <div class="modal-title">QR Code & Kirim WhatsApp</div>
       <button class="btn-icon" onclick="closeModal('modal-qr')"><i class="ti ti-x"></i></button>
     </div>
     <div class="modal-body">
@@ -1676,44 +570,41 @@ textarea.form-control { resize: vertical; min-height: 72px; }
           <div class="qr-nama" id="qr-nama-label">—</div>
           <div class="qr-meta" id="qr-meta-label">—</div>
         </div>
-        <div class="qr-code-box">
-          <div id="qr-code-render"></div>
+        <div class="qr-code-box"><div id="qr-code-render"></div></div>
+        <div class="qr-url-box" id="qr-url-display" onclick="copyQRUrl()" title="Klik untuk salin link">—</div>
+
+        <!-- Preview pesan WA -->
+        <div class="wa-preview-box" id="wa-preview-wrap">
+          <div class="wa-preview-label"><i class="ti ti-brand-whatsapp"></i> Preview Pesan WhatsApp</div>
+          <p id="wa-preview-text"></p>
         </div>
-        <div class="qr-url-box" id="qr-url-display" onclick="copyQRUrl()" title="Klik untuk salin link">
-          —
-        </div>
-        <p class="qr-instruction">
-          <i class="ti ti-info-circle" style="font-size:13px;"></i>
-          Konsumen scan QR ini untuk melihat status pesanan secara real-time.<br>
-          Atau bagikan link di atas via WhatsApp.
-        </p>
+
+        <p class="qr-instruction"><i class="ti ti-info-circle" style="font-size:13px;"></i> Klik "Kirim WA + QR" untuk membuka WhatsApp dengan pesan dan QR Code gambar sekaligus.</p>
       </div>
     </div>
     <div class="modal-footer no-print">
       <button class="btn btn-ghost btn-sm" onclick="copyQRUrl()"><i class="ti ti-copy"></i> Salin Link</button>
-      <button class="btn btn-ghost btn-sm" onclick="shareQRWA()"><i class="ti ti-brand-whatsapp"></i> Kirim WA</button>
-      <button class="btn btn-secondary" onclick="printQR()"><i class="ti ti-printer"></i> Cetak QR</button>
+      <button class="btn btn-ghost btn-sm" onclick="printQR()"><i class="ti ti-printer"></i> Cetak</button>
+      <button class="btn btn-wa" onclick="shareQRWA()"><i class="ti ti-brand-whatsapp"></i> Kirim WA + QR</button>
     </div>
   </div>
 </div>
 
-<!-- ===== MODAL STATUS KONSUMEN ===== -->
+<!-- MODAL STATUS KONSUMEN -->
 <div class="modal-overlay" id="modal-status-konsumen">
   <div class="modal" style="max-width:460px;">
     <div class="modal-header">
       <div class="modal-title">Status Pesanan</div>
       <button class="btn-icon" onclick="closeModal('modal-status-konsumen')"><i class="ti ti-x"></i></button>
     </div>
-    <div class="modal-body" id="modal-status-body">
-    </div>
-    <div class="modal-footer" id="modal-status-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-status-konsumen')">Tutup</button>
-    </div>
+    <div class="modal-body" id="modal-status-body"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('modal-status-konsumen')">Tutup</button></div>
   </div>
 </div>
 
-<!-- ===== TOAST ===== -->
+<!-- TOAST -->
 <div id="toast-container"></div>
+</div><!-- /#app-content -->
 
 <script>
 // ==============================
@@ -1723,20 +614,132 @@ let orders = [];
 let pickupFilter = 'selesai';
 let currentEditId = null;
 let unsubscribe = null;
+let currentQROrderId = null;
+let currentQROrder = null;
+let itemRowCount = 0;
+
+// ==============================
+// AUTH SYSTEM (Firebase Authentication)
+// ==============================
+function waitForFirebase() {
+  return new Promise((resolve, reject) => {
+    if (window._firebaseReady && window._db && window._auth) return resolve();
+    let elapsed = 0;
+    const iv = setInterval(() => {
+      elapsed += 100;
+      if (window._firebaseReady && window._db && window._auth) { clearInterval(iv); resolve(); }
+      else if (elapsed > 8000) { clearInterval(iv); reject(new Error('Firebase timeout')); }
+    }, 100);
+  });
+}
+
+function _showApp(user) {
+  document.getElementById('app-content').style.display = 'flex';
+  document.getElementById('login-overlay').style.display = 'none';
+  const email = user?.email || '';
+  document.getElementById('sidebar-user-email').textContent = email;
+  document.getElementById('settings-email').textContent = email;
+  if (!unsubscribe) initFirestore();
+}
+
+function _showLogin() {
+  document.getElementById('app-content').style.display = 'none';
+  document.getElementById('login-overlay').style.display = 'flex';
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+}
+
+// Toggle password visibility
+function togglePass() {
+  const inp = document.getElementById('login-pass');
+  const ico = document.getElementById('eye-icon');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+  ico.className = inp.type === 'password' ? 'ti ti-eye' : 'ti ti-eye-off';
+  inp.focus();
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  const errMsg = document.getElementById('login-error-msg');
+  const btn   = document.getElementById('btn-login');
+
+  errEl.classList.remove('show');
+  if (!email || !pass) {
+    errMsg.textContent = 'Email dan password wajib diisi.';
+    errEl.classList.add('show'); return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Memverifikasi...';
+
+  try {
+    await waitForFirebase();
+    await window._signIn(window._auth, email, pass);
+    // onAuthStateChanged akan handle tampil app
+  } catch(err) {
+    let msg = 'Email atau password salah.';
+    if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') msg = 'Email atau password salah.';
+    else if (err.code === 'auth/too-many-requests') msg = 'Terlalu banyak percobaan. Coba lagi nanti.';
+    else if (err.code === 'auth/network-request-failed') msg = 'Koneksi gagal. Periksa internet Anda.';
+    errMsg.textContent = msg;
+    errEl.classList.add('show');
+    document.getElementById('login-pass').classList.add('error-shake');
+    document.getElementById('login-pass').value = '';
+    setTimeout(() => document.getElementById('login-pass').classList.remove('error-shake'), 500);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-login"></i> Masuk';
+  }
+}
+
+async function doLogout() {
+  try {
+    await waitForFirebase();
+    await window._signOut(window._auth);
+  } catch(e) { console.error(e); }
+}
+
+// Listen auth state — runs automatically on load
+window.addEventListener('firebaseReady', () => {
+  window._onAuthStateChanged(window._auth, (user) => {
+    if (user) { _showApp(user); }
+    else { _showLogin(); }
+  });
+});
+
+// ==============================
+// FIRESTORE
+// ==============================
+function initFirestore() {
+  try {
+    const db = window._db;
+    const q = window._query(window._col(db, 'orders'), window._orderBy('createdAt', 'desc'));
+    unsubscribe = window._onSnapshot(q, (snapshot) => {
+      orders = [];
+      snapshot.forEach(d => orders.push({ id: d.id, ...d.data() }));
+      updateAllViews();
+      setFirebaseStatus(true);
+      if (window._pendingStatusId) { showOrderStatusForConsumer(window._pendingStatusId); window._pendingStatusId = null; }
+    }, (err) => { console.error('Firestore error:', err); setFirebaseStatus(false); });
+  } catch(e) { console.error('Firestore init error:', e); setFirebaseStatus(false); }
+}
+
+function setFirebaseStatus(connected) {
+  const dot = document.getElementById('firebase-dot');
+  const txt = document.getElementById('firebase-status-text');
+  const stg = document.getElementById('settings-fb-status');
+  dot.classList.toggle('connected', connected);
+  txt.textContent = connected ? 'Tersinkronisasi' : 'Tidak terhubung';
+  if (stg) stg.textContent = connected ? '✅ Terhubung ke Firebase' : '❌ Tidak terhubung';
+}
 
 // ==============================
 // NAVIGATION
 // ==============================
-const pageNames = {
-  dashboard: 'Dashboard',
-  produksi: 'Board Produksi',
-  pengambilan: 'Pengambilan Barang',
-  riwayat: 'Riwayat Order',
-  'scan-qr': 'Scan QR Pickup',
-  settings: 'Pengaturan'
-};
+const pageNames = { dashboard:'Dashboard', produksi:'Board Produksi', pengambilan:'Pengambilan Barang', riwayat:'Riwayat Order', 'scan-qr':'Scan QR Pickup', settings:'Pengaturan' };
 
-document.querySelectorAll('.nav-item').forEach(item => {
+document.querySelectorAll('.nav-item[data-page]').forEach(item => {
   item.addEventListener('click', () => {
     const page = item.dataset.page;
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -1757,85 +760,19 @@ function renderCurrentPage(page) {
   else if (page === 'scan-qr') initScanPage();
 }
 
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-}
-
-// ==============================
-// FIREBASE INIT
-// ==============================
-window.addEventListener('firebaseReady', initFirebase);
-window.addEventListener('load', () => {
-  if (window._firebaseReady) initFirebase();
-  // Set today's date in form
-  document.getElementById('f-tgl').valueAsDate = new Date();
-  // Check if URL has status param (konsumen scan QR)
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('id') || params.get('status')) {
-    window._pendingStatusId = params.get('id') || params.get('status');
-  }
-});
-
-function initFirebase() {
-  try {
-    const db = window._db;
-    const col = window._col;
-    const q = window._query(col(db, 'orders'), window._orderBy('createdAt', 'desc'));
-
-    unsubscribe = window._onSnapshot(q, (snapshot) => {
-      orders = [];
-      snapshot.forEach(doc => {
-        orders.push({ id: doc.id, ...doc.data() });
-      });
-      updateAllViews();
-      setFirebaseStatus(true);
-      // Check pending status from QR scan URL
-      if (window._pendingStatusId) {
-        showOrderStatusForConsumer(window._pendingStatusId);
-        window._pendingStatusId = null;
-      }
-    }, (err) => {
-      console.error('Firestore error:', err);
-      setFirebaseStatus(false);
-    });
-  } catch(e) {
-    console.error('Firebase init error:', e);
-    setFirebaseStatus(false);
-  }
-}
-
-function setFirebaseStatus(connected) {
-  const dot = document.getElementById('firebase-dot');
-  const txt = document.getElementById('firebase-status-text');
-  const stg = document.getElementById('settings-fb-status');
-  if (connected) {
-    dot.classList.add('connected');
-    txt.textContent = 'Tersinkronisasi';
-    if(stg) stg.textContent = '✅ Terhubung ke Firebase';
-  } else {
-    dot.classList.remove('connected');
-    txt.textContent = 'Tidak terhubung';
-    if(stg) stg.textContent = '❌ Tidak terhubung — cek konfigurasi';
-  }
-}
+function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
 
 // ==============================
 // UPDATE ALL VIEWS
 // ==============================
 function updateAllViews() {
-  renderDashboard();
-  renderKanban();
-  renderPickup();
-  renderRiwayat();
-  updateBadges();
+  renderDashboard(); renderKanban(); renderPickup(); renderRiwayat(); updateBadges();
   document.getElementById('settings-total').textContent = orders.length;
 }
 
 function updateBadges() {
-  const inProd = orders.filter(o => ['antri','proses'].includes(o.status)).length;
-  const ready = orders.filter(o => o.status === 'selesai').length;
-  document.getElementById('badge-produksi').textContent = inProd;
-  document.getElementById('badge-pickup').textContent = ready;
+  document.getElementById('badge-produksi').textContent = orders.filter(o => ['antri','proses'].includes(o.status)).length;
+  document.getElementById('badge-pickup').textContent = orders.filter(o => o.status === 'selesai').length;
 }
 
 // ==============================
@@ -1843,39 +780,27 @@ function updateBadges() {
 // ==============================
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.classList.remove('open');
-  });
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
 });
 
 // ==============================
 // ITEM ROWS
 // ==============================
-let itemRowCount = 0;
-
-function addItemRow(nama = '', qty = '', satuan = '') {
+function addItemRow(nama='', qty='', satuan='') {
   const container = document.getElementById('items-container');
   const id = 'item-' + (++itemRowCount);
   const row = document.createElement('div');
-  row.className = 'item-row';
-  row.id = id;
+  row.className = 'item-row'; row.id = id;
   row.innerHTML = `
-    <input placeholder="cth: Spanduk, Stiker, Banner..." value="${escH(nama)}" class="item-nama">
+    <input placeholder="cth: Spanduk, Stiker..." value="${escH(nama)}" class="item-nama">
     <input type="number" placeholder="1" value="${escH(qty)}" class="item-qty" min="1">
     <input placeholder="pcs, m²..." value="${escH(satuan)}" class="item-satuan">
-    <button class="item-del-btn" onclick="removeItemRow('${id}')" title="Hapus">
-      <i class="ti ti-trash"></i>
-    </button>
-  `;
+    <button class="item-del-btn" onclick="removeItemRow('${id}')"><i class="ti ti-trash"></i></button>`;
   container.appendChild(row);
 }
 
-function removeItemRow(id) {
-  const el = document.getElementById(id);
-  if (el) el.remove();
-}
+function removeItemRow(id) { const el = document.getElementById(id); if (el) el.remove(); }
 
 function getItems() {
   const rows = document.querySelectorAll('#items-container .item-row');
@@ -1890,7 +815,7 @@ function getItems() {
 }
 
 // ==============================
-// OPEN NEW ORDER MODAL
+// OPEN NEW / EDIT ORDER
 // ==============================
 function openNewOrder() {
   currentEditId = null;
@@ -1901,15 +826,11 @@ function openNewOrder() {
   document.getElementById('f-tgl').valueAsDate = new Date();
   document.getElementById('order-id-display-wrap').style.display = 'none';
   document.getElementById('f-order-no').value = '';
-  // Reset save button
-  const saveBtn = document.querySelector('#modal-order .modal-footer .btn-primary');
-  if (saveBtn) { saveBtn.innerHTML = '<i class="ti ti-device-floppy"></i> Simpan Order'; saveBtn.disabled = false; }
-  // Clear items
+  const saveBtn = document.getElementById('btn-save-order');
+  saveBtn.innerHTML = '<i class="ti ti-device-floppy"></i> Simpan Order'; saveBtn.disabled = false;
   const container = document.getElementById('items-container');
-  const rows = container.querySelectorAll('.item-row');
-  rows.forEach(r => r.remove());
-  itemRowCount = 0;
-  addItemRow();
+  container.querySelectorAll('.item-row').forEach(r => r.remove());
+  itemRowCount = 0; addItemRow();
   openModal('modal-order');
   setTimeout(() => document.getElementById('f-nama').focus(), 100);
 }
@@ -1923,29 +844,33 @@ function openEditOrder(id) {
   document.getElementById('f-wa').value = order.wa || '';
   document.getElementById('f-catatan').value = order.catatan || '';
   document.getElementById('f-tgl').value = order.tgl || '';
-  // Show order number
   document.getElementById('order-id-display-wrap').style.display = 'block';
-  document.getElementById('f-order-no').value = order.orderNo || id.slice(0, 8).toUpperCase();
-  // Clear and fill items
+  document.getElementById('f-order-no').value = order.id; // show Firestore ID
   const container = document.getElementById('items-container');
-  const rows = container.querySelectorAll('.item-row');
-  rows.forEach(r => r.remove());
+  container.querySelectorAll('.item-row').forEach(r => r.remove());
   itemRowCount = 0;
   const items = order.items || [];
-  if (items.length === 0) addItemRow();
+  if (!items.length) addItemRow();
   else items.forEach(it => addItemRow(it.nama, it.qty, it.satuan));
-  closeModal('modal-detail');
-  openModal('modal-order');
+  closeModal('modal-detail'); openModal('modal-order');
+}
+
+function copyOrderNo() {
+  const val = document.getElementById('f-order-no').value;
+  if (!val) return;
+  navigator.clipboard.writeText(val).then(() => toast('ID Order disalin!', 'success')).catch(() => {
+    const el = document.createElement('textarea'); el.value = val; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); toast('ID Order disalin!', 'success');
+  });
 }
 
 // ==============================
-// SAVE ORDER
+// SAVE ORDER — ID ACAK (crypto.randomUUID)
 // ==============================
 async function saveOrder() {
   const nama = document.getElementById('f-nama').value.trim();
   if (!nama) { toast('Nama konsumen wajib diisi!', 'error'); return; }
   const items = getItems();
-  if (items.length === 0) { toast('Tambahkan minimal satu item!', 'error'); return; }
+  if (!items.length) { toast('Tambahkan minimal satu item!', 'error'); return; }
 
   const data = {
     nama,
@@ -1956,50 +881,43 @@ async function saveOrder() {
     status: currentEditId ? orders.find(o => o.id === currentEditId)?.status || 'antri' : 'antri',
   };
 
+  const saveBtn = document.getElementById('btn-save-order');
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<i class="ti ti-loader" style="animation:spin 1s linear infinite;"></i> Menyimpan...';
+
   try {
     if (currentEditId) {
-      await window._updateDoc(window._doc(window._db, 'orders', currentEditId), {
-        ...data, updatedAt: window._serverTimestamp()
-      });
+      await window._updateDoc(window._doc(window._db, 'orders', currentEditId), { ...data, updatedAt: window._serverTimestamp() });
       toast('Order berhasil diperbarui!', 'success');
       closeModal('modal-order');
     } else {
-      // Generate human-readable order number: PF-YYMMDD-XXXX
-      const now = new Date();
-      const yy = String(now.getFullYear()).slice(-2);
-      const mm = String(now.getMonth()+1).padStart(2,'0');
-      const dd = String(now.getDate()).padStart(2,'0');
-      const rand = Math.random().toString(36).slice(-4).toUpperCase();
-      const orderNo = `PF-${yy}${mm}${dd}-${rand}`;
-      data.orderNo = orderNo;
+      // 🔒 ID ACAK — gunakan crypto.randomUUID() agar tidak bisa ditebak
+      // Format: uuid-v4 standar, simpan sebagai Firestore document ID
       data.createdAt = window._serverTimestamp();
-
+      // Kita biarkan Firestore auto-generate ID (addDoc) — ini adalah UUID acak dari Firebase
       const docRef = await window._addDoc(window._col(window._db, 'orders'), data);
-      toast(`Order disimpan! No. Order: ${orderNo}`, 'success');
+      const newId = docRef.id; // Firestore ID sudah acak & tidak bisa ditebak
 
-      // Show order ID after saving
+      toast(`Order disimpan!`, 'success');
       document.getElementById('modal-order-title').textContent = 'Order Tersimpan ✓';
       document.getElementById('order-id-display-wrap').style.display = 'block';
-      document.getElementById('f-order-no').value = orderNo;
-      currentEditId = docRef.id; // prevent re-save
-      // Change save button text
-      const saveBtn = document.querySelector('#modal-order .modal-footer .btn-primary');
-      if (saveBtn) { saveBtn.innerHTML = '<i class="ti ti-circle-check"></i> Tersimpan'; saveBtn.disabled = true; }
+      document.getElementById('f-order-no').value = newId;
+      currentEditId = newId;
+      saveBtn.innerHTML = '<i class="ti ti-circle-check"></i> Tersimpan'; saveBtn.disabled = true;
+
+      // Tawaran kirim WA langsung setelah order baru dibuat
+      const orderData = { ...data, id: newId };
+      if (data.wa) {
+        setTimeout(() => {
+          const ok = confirm(`Order untuk ${nama} berhasil disimpan!\n\nKirim notifikasi WhatsApp ke ${data.wa} sekarang?`);
+          if (ok) { currentQROrder = orderData; currentQROrderId = newId; openQRModal(newId); }
+        }, 400);
+      }
     }
   } catch(e) {
-    console.error(e);
-    toast('Gagal menyimpan. Cek koneksi & konfigurasi Firebase.', 'error');
+    console.error(e); toast('Gagal menyimpan. Cek koneksi & Firebase.', 'error');
+    saveBtn.disabled = false; saveBtn.innerHTML = '<i class="ti ti-device-floppy"></i> Simpan Order';
   }
-}
-
-function copyOrderNo() {
-  const val = document.getElementById('f-order-no').value;
-  if (!val) return;
-  navigator.clipboard.writeText(val).then(() => toast('No. Order disalin!', 'success')).catch(() => {
-    const el = document.createElement('textarea'); el.value = val;
-    document.body.appendChild(el); el.select(); document.execCommand('copy');
-    document.body.removeChild(el); toast('No. Order disalin!', 'success');
-  });
 }
 
 // ==============================
@@ -2013,9 +931,7 @@ async function updateStatus(id, status) {
     });
     toast('Status diperbarui!', 'success');
     closeModal('modal-detail');
-  } catch(e) {
-    toast('Gagal update status.', 'error');
-  }
+  } catch(e) { toast('Gagal update status.', 'error'); }
 }
 
 // ==============================
@@ -2025,11 +941,8 @@ async function deleteOrder(id) {
   if (!confirm('Hapus order ini?')) return;
   try {
     await window._deleteDoc(window._doc(window._db, 'orders', id));
-    toast('Order dihapus.', 'success');
-    closeModal('modal-detail');
-  } catch(e) {
-    toast('Gagal menghapus.', 'error');
-  }
+    toast('Order dihapus.', 'success'); closeModal('modal-detail');
+  } catch(e) { toast('Gagal menghapus.', 'error'); }
 }
 
 // ==============================
@@ -2043,37 +956,19 @@ function showDetail(id) {
   const footer = document.getElementById('modal-detail-footer');
 
   const itemsHtml = (order.items || []).map(it =>
-    `<div class="detail-item-row">
-      <span style="font-size:13.5px;">${escH(it.nama)}</span>
-      <span style="color:var(--muted);font-size:13px;">${escH(it.qty)} ${escH(it.satuan)}</span>
-    </div>`
+    `<div class="detail-item-row"><span style="font-size:13.5px;">${escH(it.nama)}</span><span style="color:var(--muted);font-size:13px;">${escH(it.qty)} ${escH(it.satuan)}</span></div>`
   ).join('');
 
   body.innerHTML = `
-    <div class="detail-item-row">
-      <span class="detail-label">No. Order</span>
-      <span style="font-family:monospace;font-size:13px;font-weight:600;color:var(--accent);">${escH(order.orderNo || order.id.slice(0,8).toUpperCase())}</span>
-    </div>
-    <div class="detail-item-row">
-      <span class="detail-label">Status</span>
-      ${badgeHtml(order.status)}
-    </div>
-    <div class="detail-item-row">
-      <span class="detail-label">Tanggal Order</span>
-      <span>${order.tgl || '-'}</span>
-    </div>
-    <div class="detail-item-row">
-      <span class="detail-label">WhatsApp</span>
-      <span>${order.wa ? `<a href="https://wa.me/62${order.wa.replace(/^0/,'')}${order.catatan?'?text='+encodeURIComponent('Halo '+order.nama+', pesanan Anda sudah selesai!'):''}">` + escH(order.wa) + '</a>' : '-'}</span>
-    </div>
+    <div class="detail-item-row"><span class="detail-label">ID Order</span><span style="font-family:monospace;font-size:11px;color:var(--muted);">${escH(order.id)}</span></div>
+    <div class="detail-item-row"><span class="detail-label">Status</span>${badgeHtml(order.status)}</div>
+    <div class="detail-item-row"><span class="detail-label">Tanggal Order</span><span>${order.tgl || '-'}</span></div>
+    <div class="detail-item-row"><span class="detail-label">WhatsApp</span><span>${order.wa || '-'}</span></div>
     ${order.catatan ? `<div class="detail-item-row"><span class="detail-label">Catatan</span><span style="font-size:13px;">${escH(order.catatan)}</span></div>` : ''}
-    <div style="margin-top:14px;">
-      <div style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Daftar Item</div>
+    <div style="margin-top:14px;"><div style="font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">Daftar Item</div>
       ${itemsHtml || '<p style="color:var(--muted);font-size:13px;">Tidak ada item</p>'}
-    </div>
-  `;
+    </div>`;
 
-  // Footer buttons based on status
   const s = order.status;
   let statusBtns = '';
   if (s === 'antri') statusBtns = `<button class="btn btn-secondary" onclick="updateStatus('${id}','proses')"><i class="ti ti-play"></i> Mulai Proses</button>`;
@@ -2083,11 +978,8 @@ function showDetail(id) {
   footer.innerHTML = `
     <button class="btn btn-ghost btn-sm btn-danger" onclick="deleteOrder('${id}')"><i class="ti ti-trash"></i></button>
     <button class="btn btn-ghost btn-sm" onclick="openEditOrder('${id}')"><i class="ti ti-edit"></i> Edit</button>
-    <button class="btn btn-ghost btn-sm" onclick="openQRModal('${id}')"><i class="ti ti-qrcode"></i> QR Code</button>
-    <div style="flex:1"></div>
-    ${statusBtns}
-  `;
-
+    <button class="btn btn-ghost btn-sm" onclick="openQRModal('${id}')"><i class="ti ti-qrcode"></i> QR / WA</button>
+    <div style="flex:1"></div>${statusBtns}`;
   openModal('modal-detail');
 }
 
@@ -2095,31 +987,22 @@ function showDetail(id) {
 // DASHBOARD
 // ==============================
 function renderDashboard() {
-  const total = orders.length;
-  const proses = orders.filter(o => ['antri','proses'].includes(o.status)).length;
-  const selesai = orders.filter(o => o.status === 'selesai').length;
-  const diambil = orders.filter(o => o.status === 'diambil').length;
-  document.getElementById('stat-total').textContent = total;
-  document.getElementById('stat-proses').textContent = proses;
-  document.getElementById('stat-selesai').textContent = selesai;
-  document.getElementById('stat-diambil').textContent = diambil;
-
+  document.getElementById('stat-total').textContent = orders.length;
+  document.getElementById('stat-proses').textContent = orders.filter(o => ['antri','proses'].includes(o.status)).length;
+  document.getElementById('stat-selesai').textContent = orders.filter(o => o.status === 'selesai').length;
+  document.getElementById('stat-diambil').textContent = orders.filter(o => o.status === 'diambil').length;
   const recent = orders.slice(0, 10);
   const tbody = document.getElementById('tbl-recent');
-  if (!recent.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada order</p></div></td></tr>`;
-    return;
-  }
+  if (!recent.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada order</p></div></td></tr>`; return; }
   tbody.innerHTML = recent.map(o => `
     <tr>
-      <td style="font-family:monospace;font-size:12px;color:var(--muted);">${escH(o.orderNo || o.id.slice(0,8).toUpperCase())}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--muted);">${escH(o.id.slice(0,8))}…</td>
       <td class="td-name">${escH(o.nama)}</td>
       <td style="color:var(--muted);font-size:12.5px;">${(o.items||[]).map(i=>`${i.qty} ${i.satuan} ${i.nama}`).join(', ')}</td>
       <td style="color:var(--muted);font-size:12.5px;">${o.tgl || '-'}</td>
       <td>${badgeHtml(o.status)}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="showDetail('${o.id}')"><i class="ti ti-eye"></i></button></td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
 }
 
 // ==============================
@@ -2128,47 +1011,29 @@ function renderDashboard() {
 function renderKanban() {
   const q = document.getElementById('search-prod')?.value.toLowerCase() || '';
   const filtered = orders.filter(o => !q || o.nama?.toLowerCase().includes(q));
-
   const cols = [
-    { key: 'antri', label: 'Antri', cls: 'kh-antri', icon: 'ti-clock' },
-    { key: 'proses', label: 'Proses', cls: 'kh-proses', icon: 'ti-loader' },
-    { key: 'selesai', label: 'Selesai', cls: 'kh-selesai', icon: 'ti-circle-check' },
-    { key: 'diambil', label: 'Diambil', cls: 'kh-diambil', icon: 'ti-package-export' },
+    {key:'antri', label:'Antri', cls:'kh-antri', icon:'ti-clock'},
+    {key:'proses', label:'Proses', cls:'kh-proses', icon:'ti-loader'},
+    {key:'selesai', label:'Selesai', cls:'kh-selesai', icon:'ti-circle-check'},
+    {key:'diambil', label:'Diambil', cls:'kh-diambil', icon:'ti-package-export'},
   ];
-
   const board = document.getElementById('kanban-board');
   board.innerHTML = cols.map(col => {
     const colOrders = filtered.filter(o => o.status === col.key);
     const cards = colOrders.length ? colOrders.map(o => {
-      const itemsHtml = (o.items || []).slice(0,3).map(it =>
-        `<div class="kcard-item-line"><div class="kcard-item-dot"></div><span>${escH(it.qty)} ${escH(it.satuan)} ${escH(it.nama)}</span></div>`
-      ).join('');
-      const more = (o.items||[]).length > 3 ? `<div style="color:var(--muted);font-size:10.5px;margin-top:3px;">+${(o.items.length-3)} item lagi</div>` : '';
-
+      const itemsHtml = (o.items || []).slice(0,3).map(it => `<div class="kcard-item-line"><div class="kcard-item-dot"></div><span>${escH(it.qty)} ${escH(it.satuan)} ${escH(it.nama)}</span></div>`).join('');
+      const more = (o.items||[]).length > 3 ? `<div style="color:var(--muted);font-size:10.5px;margin-top:3px;">+${o.items.length-3} item lagi</div>` : '';
       let actionBtn = '';
       if (col.key === 'antri') actionBtn = `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();updateStatus('${o.id}','proses')"><i class="ti ti-play"></i> Proses</button>`;
       if (col.key === 'proses') actionBtn = `<button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();updateStatus('${o.id}','selesai')"><i class="ti ti-check"></i> Selesai</button>`;
-
-      return `
-        <div class="kcard" onclick="showDetail('${o.id}')">
-          <div style="font-size:10px;font-family:monospace;color:var(--muted);margin-bottom:2px;">${escH(o.orderNo || o.id.slice(0,8).toUpperCase())}</div>
-          <div class="kcard-name">${escH(o.nama)}</div>
-          <div class="kcard-date"><i class="ti ti-calendar" style="font-size:11px;"></i> ${o.tgl || '-'}</div>
-          <div class="kcard-items">${itemsHtml}${more}</div>
-          ${actionBtn ? `<div class="kcard-actions">${actionBtn}</div>` : ''}
-        </div>
-      `;
-    }).join('') : `<div style="text-align:center;padding:24px 12px;color:var(--muted);font-size:12px;"><i class="ti ti-${col.icon}" style="font-size:22px;opacity:0.3;display:block;margin-bottom:6px;"></i>Kosong</div>`;
-
-    return `
-      <div class="kanban-col">
-        <div class="kanban-header ${col.cls}">
-          <span>${col.label}</span>
-          <span class="kanban-count">${colOrders.length}</span>
-        </div>
-        <div class="kanban-body">${cards}</div>
-      </div>
-    `;
+      return `<div class="kcard" onclick="showDetail('${o.id}')">
+        <div class="kcard-name">${escH(o.nama)}</div>
+        <div class="kcard-date"><i class="ti ti-calendar" style="font-size:11px;"></i> ${o.tgl || '-'}</div>
+        <div class="kcard-items">${itemsHtml}${more}</div>
+        ${actionBtn ? `<div class="kcard-actions">${actionBtn}</div>` : ''}
+      </div>`;
+    }).join('') : `<div style="text-align:center;padding:24px 12px;color:var(--muted);font-size:12px;"><i class="ti ${col.icon}" style="font-size:22px;opacity:0.3;display:block;margin-bottom:6px;"></i>Kosong</div>`;
+    return `<div class="kanban-col"><div class="kanban-header ${col.cls}"><span>${col.label}</span><span class="kanban-count">${colOrders.length}</span></div><div class="kanban-body">${cards}</div></div>`;
   }).join('');
 }
 
@@ -2184,44 +1049,31 @@ function setPickupFilter(f, btn) {
 
 function renderPickup() {
   const q = document.getElementById('search-pickup')?.value.toLowerCase() || '';
-  let filtered = orders.filter(o => {
-    const matchQ = !q || o.nama?.toLowerCase().includes(q);
-    const matchF = pickupFilter === 'all' ? ['selesai','diambil'].includes(o.status) : o.status === pickupFilter;
-    return matchQ && matchF;
+  const filtered = orders.filter(o => {
+    const mQ = !q || o.nama?.toLowerCase().includes(q);
+    const mF = pickupFilter === 'all' ? ['selesai','diambil'].includes(o.status) : o.status === pickupFilter;
+    return mQ && mF;
   });
-
   const list = document.getElementById('pickup-list');
-  if (!filtered.length) {
-    list.innerHTML = `<div class="empty-state"><i class="ti ti-package"></i><p>${pickupFilter === 'selesai' ? 'Tidak ada order yang siap diambil' : 'Tidak ada data'}</p></div>`;
-    return;
-  }
-
+  if (!filtered.length) { list.innerHTML = `<div class="empty-state"><i class="ti ti-package"></i><p>${pickupFilter==='selesai'?'Tidak ada order siap diambil':'Tidak ada data'}</p></div>`; return; }
   list.innerHTML = filtered.map(o => {
-    const tagsHtml = (o.items || []).map(it =>
-      `<span class="pickup-item-tag">${escH(it.qty)} ${escH(it.satuan)} ${escH(it.nama)}</span>`
-    ).join('');
-
-    const waBtn = o.wa ? `<a href="https://wa.me/62${o.wa.replace(/^0/,'')}?text=${encodeURIComponent('Halo '+o.nama+', pesanan Anda sudah selesai dan siap diambil!')}" target="_blank" class="btn btn-ghost btn-sm" style="color:#22c55e;border-color:#22c55e;"><i class="ti ti-brand-whatsapp"></i> WA</a>` : '';
-
+    const tagsHtml = (o.items||[]).map(it => `<span class="pickup-item-tag">${escH(it.qty)} ${escH(it.satuan)} ${escH(it.nama)}</span>`).join('');
+    const waBtn = o.wa ? `<button class="btn btn-wa btn-sm" onclick="openQRModal('${o.id}')"><i class="ti ti-brand-whatsapp"></i> WA / QR</button>` : '';
     const pickupBtn = o.status === 'selesai'
       ? `<button class="btn btn-primary btn-sm" onclick="updateStatus('${o.id}','diambil')"><i class="ti ti-package-export"></i> Diambil</button>`
       : `<span class="badge badge-diambil"><span class="badge-dot"></span>Sudah Diambil</span>`;
-
-    return `
-      <div class="pickup-card">
-        <div class="pickup-info">
-          <div class="pickup-name">${escH(o.nama)}</div>
-          <div class="pickup-meta"><i class="ti ti-calendar" style="font-size:12px;"></i> ${o.tgl || '-'} ${o.wa ? `• <i class="ti ti-phone" style="font-size:12px;"></i> ${escH(o.wa)}` : ''}</div>
-          <div class="pickup-items">${tagsHtml}</div>
-          ${o.catatan ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;"><i class="ti ti-notes" style="font-size:12px;"></i> ${escH(o.catatan)}</div>` : ''}
-        </div>
-        <div class="pickup-actions">
-          <button class="btn btn-ghost btn-sm" onclick="openQRModal('${o.id}')" style="color:var(--purple);border-color:var(--purple);"><i class="ti ti-qrcode"></i> QR</button>
-          ${waBtn}
-          ${pickupBtn}
-        </div>
+    return `<div class="pickup-card">
+      <div class="pickup-info">
+        <div class="pickup-name">${escH(o.nama)}</div>
+        <div class="pickup-meta"><i class="ti ti-calendar" style="font-size:12px;"></i> ${o.tgl||'-'} ${o.wa?`• <i class="ti ti-phone" style="font-size:12px;"></i> ${escH(o.wa)}`:''}  </div>
+        <div class="pickup-items">${tagsHtml}</div>
+        ${o.catatan?`<div style="font-size:12px;color:var(--muted);margin-top:6px;"><i class="ti ti-notes"></i> ${escH(o.catatan)}</div>`:''}
       </div>
-    `;
+      <div class="pickup-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openQRModal('${o.id}')" style="color:var(--purple);border-color:var(--purple);"><i class="ti ti-qrcode"></i> QR</button>
+        ${waBtn}${pickupBtn}
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -2231,37 +1083,25 @@ function renderPickup() {
 function renderRiwayat() {
   const q = document.getElementById('search-riwayat')?.value.toLowerCase() || '';
   const filtered = orders.filter(o => !q || o.nama?.toLowerCase().includes(q));
-
   const tbody = document.getElementById('tbl-riwayat');
-  if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada data</p></div></td></tr>`;
-    return;
-  }
+  if (!filtered.length) { tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state"><i class="ti ti-inbox"></i><p>Belum ada data</p></div></td></tr>`; return; }
   tbody.innerHTML = filtered.map(o => `
     <tr>
-      <td style="font-family:monospace;font-size:12px;color:var(--muted);">${escH(o.orderNo || o.id.slice(0,8).toUpperCase())}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--muted);">${escH(o.id.slice(0,8))}…</td>
       <td class="td-name">${escH(o.nama)}</td>
       <td style="color:var(--muted);font-size:12.5px;">${(o.items||[]).map(i=>`${i.qty} ${i.satuan} ${i.nama}`).join(', ')}</td>
-      <td style="color:var(--muted);font-size:12.5px;">${o.tgl || '-'}</td>
+      <td style="color:var(--muted);font-size:12.5px;">${o.tgl||'-'}</td>
       <td>${badgeHtml(o.status)}</td>
-      <td>
-        <button class="btn btn-ghost btn-sm" onclick="showDetail('${o.id}')"><i class="ti ti-eye"></i></button>
-      </td>
-    </tr>
-  `).join('');
+      <td><button class="btn btn-ghost btn-sm" onclick="showDetail('${o.id}')"><i class="ti ti-eye"></i></button></td>
+    </tr>`).join('');
 }
 
 // ==============================
 // HELPERS
 // ==============================
 function badgeHtml(status) {
-  const map = {
-    antri: ['badge-antri', 'Antri'],
-    proses: ['badge-proses', 'Proses'],
-    selesai: ['badge-selesai', 'Selesai'],
-    diambil: ['badge-diambil', 'Diambil'],
-  };
-  const [cls, label] = map[status] || ['badge-diambil', status];
+  const map = { antri:['badge-antri','Antri'], proses:['badge-proses','Proses'], selesai:['badge-selesai','Selesai'], diambil:['badge-diambil','Diambil'] };
+  const [cls,label] = map[status] || ['badge-diambil', status];
   return `<span class="badge ${cls}"><span class="badge-dot"></span>${label}</span>`;
 }
 
@@ -2270,27 +1110,27 @@ function escH(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function toast(msg, type = '') {
+function toast(msg, type='') {
   const container = document.getElementById('toast-container');
-  const el = document.createElement('div');
-  el.className = `toast ${type}`;
-  const icon = type === 'success' ? 'ti-circle-check' : type === 'error' ? 'ti-alert-circle' : 'ti-info-circle';
+  const el = document.createElement('div'); el.className = `toast ${type}`;
+  const icon = type==='success'?'ti-circle-check':type==='error'?'ti-alert-circle':'ti-info-circle';
   el.innerHTML = `<i class="ti ${icon}"></i> ${msg}`;
   container.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; el.style.transform = 'translateY(8px)'; el.style.transition = '0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+  setTimeout(() => { el.style.opacity='0'; el.style.transform='translateY(8px)'; el.style.transition='0.3s'; setTimeout(()=>el.remove(),300); }, 3000);
 }
 
 // ==============================
 // QR CODE FUNCTIONS
 // ==============================
-let currentQROrderId = null;
-let currentQROrder = null;
-
 function getStatusURL(orderId) {
-  // URL track.html terpisah — deploy bersama di GitHub Pages
   const base = window.location.href.split('#')[0].split('?')[0];
   const dir = base.substring(0, base.lastIndexOf('/') + 1);
   return `${dir}track.html?id=${orderId}`;
+}
+
+function buildWAMessage(order, url, storeName) {
+  const itemsText = (order.items||[]).map(it=>`• ${it.qty} ${it.satuan} ${it.nama}`).join('\n');
+  return `Halo *${order.nama}*! 👋\n\nPesanan Anda di *${storeName}* sudah terdaftar.\n\n📋 *Detail Pesanan:*\n${itemsText}\n📅 Tanggal: ${order.tgl||'-'}\n\nGunakan link ini untuk memantau status pesanan Anda secara real-time:\n🔗 ${url}\n\nAtau tunjukkan *QR Code* saat pengambilan. Terima kasih! 🙏`;
 }
 
 function openQRModal(id) {
@@ -2300,27 +1140,23 @@ function openQRModal(id) {
   currentQROrder = order;
 
   const url = getStatusURL(id);
-  const storeName = document.getElementById('store-name')?.value || 'Digital Printing';
+  const storeName = document.getElementById('store-name')?.value || 'Printcess Digital Printing';
 
   document.getElementById('qr-nama-label').textContent = order.nama;
-  const itemsStr = (order.items || []).map(it => `${it.qty} ${it.satuan} ${it.nama}`).join(', ');
-  document.getElementById('qr-meta-label').textContent = `${itemsStr} • ${order.tgl || '-'}`;
+  const itemsStr = (order.items||[]).map(it=>`${it.qty} ${it.satuan} ${it.nama}`).join(', ');
+  document.getElementById('qr-meta-label').textContent = `${itemsStr} • ${order.tgl||'-'}`;
   document.getElementById('qr-url-display').textContent = url;
 
-  // Render QR Code
+  // Preview pesan WA
+  document.getElementById('wa-preview-text').textContent = buildWAMessage(order, url, storeName);
+
+  // Render QR
   const qrWrap = document.getElementById('qr-code-render');
   qrWrap.innerHTML = '';
   try {
-    new QRCode(qrWrap, {
-      text: url,
-      width: 200,
-      height: 200,
-      colorDark: '#0f0e17',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
-    });
+    new QRCode(qrWrap, { text: url, width: 200, height: 200, colorDark: '#0f0e17', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
   } catch(e) {
-    qrWrap.innerHTML = `<div style="width:200px;height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;text-align:center;padding:20px;">QR library tidak termuat. Gunakan link di bawah.</div>`;
+    qrWrap.innerHTML = `<div style="width:200px;height:200px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;text-align:center;padding:20px;">QR library tidak termuat.</div>`;
   }
 
   closeModal('modal-detail');
@@ -2330,32 +1166,74 @@ function openQRModal(id) {
 function copyQRUrl() {
   if (!currentQROrderId) return;
   const url = getStatusURL(currentQROrderId);
-  navigator.clipboard.writeText(url).then(() => {
-    toast('Link berhasil disalin!', 'success');
-  }).catch(() => {
-    // fallback
-    const el = document.createElement('textarea');
-    el.value = url;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-    toast('Link berhasil disalin!', 'success');
+  navigator.clipboard.writeText(url).then(() => toast('Link berhasil disalin!', 'success')).catch(() => {
+    const el = document.createElement('textarea'); el.value = url; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); toast('Link berhasil disalin!', 'success');
   });
 }
 
-function shareQRWA() {
+// ==============================
+// KIRIM WA + QR CODE GAMBAR
+// ==============================
+async function shareQRWA() {
   if (!currentQROrder || !currentQROrderId) return;
+
   const url = getStatusURL(currentQROrderId);
-  const storeName = document.getElementById('store-name')?.value || 'Digital Printing';
-  const msg = `Halo ${currentQROrder.nama}! 👋\n\nPesanan Anda di *${storeName}* sudah terdaftar.\n\nGunakan link ini untuk memantau status pesanan Anda secara real-time:\n${url}\n\nAtau tunjukkan QR Code ini saat pengambilan.`;
-  const wa = currentQROrder.wa ? `62${currentQROrder.wa.replace(/^0/, '')}` : '';
-  window.open(`https://wa.me/${wa}?text=${encodeURIComponent(msg)}`, '_blank');
+  const storeName = document.getElementById('store-name')?.value || 'Printcess Digital Printing';
+  const msg = buildWAMessage(currentQROrder, url, storeName);
+  const wa = currentQROrder.wa ? `62${currentQROrder.wa.replace(/^0+/, '')}` : '';
+
+  // Buka WA dengan pesan teks dulu
+  const waUrl = `https://wa.me/${wa}?text=${encodeURIComponent(msg)}`;
+  window.open(waUrl, '_blank');
+
+  // Kemudian tawarkan untuk download & kirim gambar QR secara terpisah
+  // Ambil canvas dari QRCode yang sudah di-render
+  const canvas = document.querySelector('#qr-code-render canvas');
+  if (canvas) {
+    // Buat canvas yang lebih besar dengan nama konsumen
+    const bigCanvas = document.createElement('canvas');
+    bigCanvas.width = 320;
+    bigCanvas.height = 380;
+    const ctx = bigCanvas.getContext('2d');
+
+    // Background putih
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 320, 380);
+
+    // Header toko
+    ctx.fillStyle = '#0f0e17';
+    ctx.fillRect(0, 0, 320, 60);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(storeName, 160, 38);
+
+    // QR code
+    ctx.drawImage(canvas, 60, 75, 200, 200);
+
+    // Nama konsumen
+    ctx.fillStyle = '#0f0e17';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentQROrder.nama, 160, 305);
+
+    // Instruksi
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = '#6b6560';
+    ctx.fillText('Scan QR untuk cek status pesanan', 160, 330);
+    ctx.fillText('atau tunjukkan saat pengambilan', 160, 352);
+
+    // Download
+    const link = document.createElement('a');
+    link.download = `QR-${currentQROrder.nama.replace(/\s+/g, '-')}.png`;
+    link.href = bigCanvas.toDataURL('image/png');
+    link.click();
+
+    toast('QR Code diunduh! Kirim gambarnya via WhatsApp secara manual.', 'success');
+  }
 }
 
-function printQR() {
-  window.print();
-}
+function printQR() { window.print(); }
 
 // ==============================
 // SCAN QR / CEK STATUS
@@ -2363,36 +1241,17 @@ function printQR() {
 function initScanPage() {
   document.getElementById('scan-manual-input').value = '';
   document.getElementById('scan-result-wrap').style.display = 'none';
-
-  // Check if URL has ?status= param (for konsumen view)
-  checkURLStatusParam();
-}
-
-function checkURLStatusParam() {
   const params = new URLSearchParams(window.location.search);
   const statusId = params.get('id') || params.get('status');
-  if (statusId) {
-    showOrderStatusForConsumer(statusId);
-  }
+  if (statusId) showOrderStatusForConsumer(statusId);
 }
 
 function processQRScan() {
-  const val = document.getElementById('scan-manual-input').value.trim();
-  if (!val) { toast('Masukkan ID order atau No. Order terlebih dahulu', 'error'); return; }
-
-  // Support: full URL, Firestore doc ID, or No. Order (e.g. PF-240603-AB12)
-  let orderId = val;
-  if (val.includes('?id=')) {
-    orderId = val.split('?id=')[1].split('&')[0];
-  } else if (val.includes('?status=')) {
-    orderId = val.split('?status=')[1].split('&')[0];
-  }
-
-  // If it looks like orderNo (e.g. PF-...), find the Firestore ID
-  const byOrderNo = orders.find(o => o.orderNo && o.orderNo.toUpperCase() === orderId.toUpperCase());
-  if (byOrderNo) orderId = byOrderNo.id;
-
-  showScanResult(orderId);
+  let val = document.getElementById('scan-manual-input').value.trim();
+  if (!val) { toast('Masukkan ID order terlebih dahulu', 'error'); return; }
+  if (val.includes('?id=')) val = val.split('?id=')[1].split('&')[0];
+  else if (val.includes('?status=')) val = val.split('?status=')[1].split('&')[0];
+  showScanResult(val);
 }
 
 function showScanResult(orderId) {
@@ -2401,264 +1260,75 @@ function showScanResult(orderId) {
   wrap.style.display = 'block';
 
   if (!order) {
-    wrap.innerHTML = `
-      <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:var(--r);padding:18px 20px;text-align:center;">
-        <i class="ti ti-alert-circle" style="font-size:28px;color:#dc2626;margin-bottom:8px;display:block;"></i>
-        <div style="font-weight:600;color:#991b1b;margin-bottom:4px;">Order tidak ditemukan</div>
-        <div style="font-size:12.5px;color:#b91c1c;">ID: <code>${escH(orderId)}</code></div>
-      </div>`;
-    return;
+    wrap.innerHTML = `<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:var(--r);padding:18px 20px;text-align:center;">
+      <i class="ti ti-alert-circle" style="font-size:28px;color:#dc2626;margin-bottom:8px;display:block;"></i>
+      <div style="font-weight:600;color:#991b1b;margin-bottom:4px;">Order tidak ditemukan</div>
+      <div style="font-size:12.5px;color:#b91c1c;">ID: <code>${escH(orderId)}</code></div>
+    </div>`; return;
   }
 
   const statusInfo = {
-    antri: { icon: 'ti-clock', label: 'Menunggu Antrian', desc: 'Pesanan Anda sedang menunggu untuk diproses', cls: 'status-icon-antri' },
-    proses: { icon: 'ti-loader', label: 'Sedang Diproses', desc: 'Pesanan Anda sedang dalam pengerjaan', cls: 'status-icon-proses' },
-    selesai: { icon: 'ti-circle-check', label: 'Siap Diambil!', desc: 'Pesanan Anda sudah selesai dan siap untuk diambil', cls: 'status-icon-selesai' },
-    diambil: { icon: 'ti-package-export', label: 'Sudah Diambil', desc: 'Pesanan ini sudah diambil', cls: 'status-icon-diambil' },
+    antri:  {icon:'ti-clock',label:'Menunggu Antrian',desc:'Sedang menunggu giliran diproses',cls:'status-icon-antri'},
+    proses: {icon:'ti-loader',label:'Sedang Diproses',desc:'Pesanan sedang dalam pengerjaan',cls:'status-icon-proses'},
+    selesai:{icon:'ti-circle-check',label:'Siap Diambil!',desc:'Pesanan sudah selesai dan siap diambil',cls:'status-icon-selesai'},
+    diambil:{icon:'ti-package-export',label:'Sudah Diambil',desc:'Pesanan ini sudah diambil',cls:'status-icon-diambil'},
   };
   const si = statusInfo[order.status] || statusInfo.antri;
-  const itemsStr = (order.items || []).map(it => `<span class="pickup-item-tag">${escH(it.qty)} ${escH(it.satuan)} ${escH(it.nama)}</span>`).join('');
   const steps = ['antri','proses','selesai','diambil'];
   const currentIdx = steps.indexOf(order.status);
-
-  const progressHtml = steps.map((s, i) => {
-    const lbl = { antri:'Antri', proses:'Proses', selesai:'Selesai', diambil:'Diambil' }[s];
-    const ic = { antri:'ti-clock', proses:'ti-loader', selesai:'ti-circle-check', diambil:'ti-package-export' }[s];
-    let dotCls = '';
-    let lblCls = '';
-    if (i < currentIdx) { dotCls = 'done'; lblCls = 'done'; }
-    else if (i === currentIdx) { dotCls = 'active'; lblCls = 'active'; }
-    return `
-      <div class="status-step">
-        <div class="status-step-dot ${dotCls}"><i class="ti ${ic}" style="font-size:14px;"></i></div>
-        <div class="status-step-label ${lblCls}">${lbl}</div>
-      </div>`;
+  const progressHtml = steps.map((s,i) => {
+    const lbl={antri:'Antri',proses:'Proses',selesai:'Selesai',diambil:'Diambil'}[s];
+    const ic={antri:'ti-clock',proses:'ti-loader',selesai:'ti-circle-check',diambil:'ti-package-export'}[s];
+    let dC='', lC='';
+    if(i<currentIdx){dC='done';lC='done';}else if(i===currentIdx){dC='active';lC='active';}
+    return `<div class="status-step"><div class="status-step-dot ${dC}"><i class="ti ${ic}" style="font-size:14px;"></i></div><div class="status-step-label ${lC}">${lbl}</div></div>`;
   }).join('');
-
-  wrap.innerHTML = `
-    <div class="status-card" style="border-radius:var(--r);overflow:hidden;">
-      <div style="padding:18px 20px;background:var(--ink);color:#fff;">
-        <div style="font-family:var(--font-head);font-size:16px;font-weight:700;">${escH(order.nama)}</div>
-        <div style="font-size:11.5px;color:rgba(255,255,255,0.45);margin-top:2px;">${order.tgl || '-'}</div>
+  const itemsStr = (order.items||[]).map(it=>`<span class="pickup-item-tag">${escH(it.qty)} ${escH(it.satuan)} ${escH(it.nama)}</span>`).join('');
+  wrap.innerHTML = `<div class="status-card" style="background:var(--card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:0 8px 32px rgba(15,14,23,0.1);">
+    <div style="padding:18px 20px;background:var(--ink);color:#fff;">
+      <div style="font-family:var(--font-head);font-size:16px;font-weight:700;">${escH(order.nama)}</div>
+      <div style="font-size:11.5px;color:rgba(255,255,255,0.45);margin-top:2px;">${order.tgl||'-'}</div>
+    </div>
+    <div style="padding:20px;">
+      <div class="status-progress">${progressHtml}</div>
+      <div style="text-align:center;padding:12px 0 16px;">
+        <div class="status-icon-wrap ${si.cls}" style="margin-bottom:10px;"><i class="ti ${si.icon}"></i></div>
+        <div style="font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:4px;">${si.label}</div>
+        <div style="font-size:13px;color:var(--muted);">${si.desc}</div>
       </div>
-      <div style="padding:20px;">
-        <div class="status-progress">${progressHtml}</div>
-        <div style="text-align:center;padding:12px 0 16px;">
-          <div class="status-icon-wrap ${si.cls}" style="margin-bottom:10px;">
-            <i class="ti ${si.icon}"></i>
-          </div>
-          <div style="font-family:var(--font-head);font-size:18px;font-weight:700;margin-bottom:4px;">${si.label}</div>
-          <div style="font-size:13px;color:var(--muted);">${si.desc}</div>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">${itemsStr}</div>
-        ${order.status === 'selesai' ? `<button class="btn btn-primary" style="width:100%;" onclick="updateStatus('${order.id}','diambil');document.getElementById('scan-result-wrap').style.display='none';">
-          <i class="ti ti-package-export"></i> Konfirmasi Diambil
-        </button>` : ''}
-      </div>
-    </div>`;
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">${itemsStr}</div>
+      ${order.status==='selesai'?`<button class="btn btn-primary" style="width:100%;" onclick="updateStatus('${order.id}','diambil');document.getElementById('scan-result-wrap').style.display='none';"><i class="ti ti-package-export"></i> Konfirmasi Diambil</button>`:''}
+    </div>
+  </div>`;
 }
 
-// Konsumen status view via URL param
 function showOrderStatusForConsumer(orderId) {
-  // Navigate to scan-qr page and show result
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelector('[data-page="scan-qr"]').classList.add('active');
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.getElementById('page-scan-qr').classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelector('[data-page="scan-qr"]')?.classList.add('active');
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-scan-qr')?.classList.add('active');
   document.getElementById('topbar-title').textContent = 'Status Pesanan';
-
-  // Wait for orders to load
-  const tryShow = () => {
-    if (orders.length > 0 || window._firebaseReady) {
-      showOrderStatusModal(orderId);
-    } else {
-      setTimeout(tryShow, 500);
-    }
-  };
-
-  setTimeout(() => showOrderStatusModal(orderId), 800);
+  setTimeout(() => showScanResult(orderId), 800);
 }
 
-function showOrderStatusModal(orderId) {
-  const order = orders.find(o => o.id === orderId);
-  const body = document.getElementById('modal-status-body');
-  const footer = document.getElementById('modal-status-footer');
-
-  if (!order) {
-    body.innerHTML = `<div style="text-align:center;padding:20px;">
-      <i class="ti ti-alert-circle" style="font-size:36px;color:#dc2626;display:block;margin-bottom:12px;"></i>
-      <div style="font-weight:600;margin-bottom:6px;">Pesanan tidak ditemukan</div>
-      <div style="font-size:13px;color:var(--muted);">Pastikan QR code yang Anda scan benar.</div>
-    </div>`;
-    openModal('modal-status-konsumen');
-    return;
-  }
-
-  const statusInfo = {
-    antri: { icon: 'ti-clock', label: 'Menunggu Antrian', desc: 'Pesanan Anda sedang menunggu untuk diproses. Mohon bersabar ya! 🙏', cls: 'status-icon-antri' },
-    proses: { icon: 'ti-loader', label: 'Sedang Diproses', desc: 'Pesanan Anda sedang dalam pengerjaan. Hampir selesai! ✨', cls: 'status-icon-proses' },
-    selesai: { icon: 'ti-circle-check', label: '🎉 Siap Diambil!', desc: 'Pesanan Anda sudah selesai dan siap diambil. Silakan datang ke toko!', cls: 'status-icon-selesai' },
-    diambil: { icon: 'ti-package-export', label: 'Sudah Diambil', desc: 'Pesanan ini sudah diambil. Terima kasih! 💖', cls: 'status-icon-diambil' },
-  };
-
-  const si = statusInfo[order.status] || statusInfo.antri;
-  const steps = ['antri','proses','selesai','diambil'];
-  const currentIdx = steps.indexOf(order.status);
-
-  const progressHtml = steps.map((s, i) => {
-    const lbl = { antri:'Antri', proses:'Proses', selesai:'Selesai', diambil:'Diambil' }[s];
-    const ic = { antri:'ti-clock', proses:'ti-loader', selesai:'ti-circle-check', diambil:'ti-package-export' }[s];
-    let dotCls = '', lblCls = '';
-    if (i < currentIdx) { dotCls = 'done'; lblCls = 'done'; }
-    else if (i === currentIdx) { dotCls = 'active'; lblCls = 'active'; }
-    return `<div class="status-step">
-      <div class="status-step-dot ${dotCls}"><i class="ti ${ic}" style="font-size:14px;"></i></div>
-      <div class="status-step-label ${lblCls}">${lbl}</div>
-    </div>`;
-  }).join('');
-
-  const itemsStr = (order.items || []).map(it =>
-    `<span class="pickup-item-tag">${escH(it.qty)} ${escH(it.satuan)} ${escH(it.nama)}</span>`
-  ).join('');
-
-  body.innerHTML = `
-    <div class="status-progress" style="margin:4px 0 20px;">${progressHtml}</div>
-    <div class="status-hero">
-      <div class="status-icon-wrap ${si.cls}">
-        <i class="ti ${si.icon}"></i>
-      </div>
-      <div class="status-hero-label">${si.label}</div>
-      <div class="status-hero-desc">${si.desc}</div>
-    </div>
-    <div class="qr-order-info" style="margin-top:4px;">
-      <div class="qr-nama">${escH(order.nama)}</div>
-      <div class="qr-meta" style="margin-top:6px;">${order.tgl ? '📅 ' + order.tgl : ''}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;">${itemsStr}</div>
-      ${order.catatan ? `<div style="font-size:12px;color:var(--muted);margin-top:8px;"><i class="ti ti-notes"></i> ${escH(order.catatan)}</div>` : ''}
-    </div>
-  `;
-
-  openModal('modal-status-konsumen');
-}
-
-// keyboard shortcut
+// ==============================
+// KEYBOARD SHORTCUTS
+// ==============================
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') {
-    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
-    e.preventDefault();
-    openNewOrder();
-  }
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
+  if ((e.ctrlKey||e.metaKey) && e.key==='n') { e.preventDefault(); openNewOrder(); }
 });
 
 // ==============================
-// LOGIN SYSTEM (SECURE — key dari Firestore, bukan hardcode)
+// INIT — check URL param
 // ==============================
-const SESSION_KEY = 'pf_auth_session';
-
-function toggleKeyVisibility() {
-  const input = document.getElementById('login-key-input');
-  const icon  = document.getElementById('eye-icon');
-  if (input.type === 'password') {
-    input.type = 'text';
-    icon.className = 'ti ti-eye-off';
-  } else {
-    input.type = 'password';
-    icon.className = 'ti ti-eye';
+window.addEventListener('load', () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('id') || params.get('status')) {
+    window._pendingStatusId = params.get('id') || params.get('status');
   }
-  input.focus();
-}
-
-function checkLoginSession() {
-  const session = sessionStorage.getItem(SESSION_KEY);
-  if (session === 'authenticated') {
-    document.getElementById('login-overlay').classList.add('hidden');
-  }
-}
-
-async function doLogin() {
-  const input = document.getElementById('login-key-input');
-  const errEl = document.getElementById('login-error');
-  const btnLogin = document.getElementById('btn-login');
-  const val = input.value.trim();
-
-  if (!val) {
-    errEl.textContent = 'Masukkan access key terlebih dahulu.';
-    errEl.classList.add('show');
-    return;
-  }
-
-  // Tampilkan loading
-  btnLogin.disabled = true;
-  btnLogin.textContent = 'Memverifikasi...';
-
-  try {
-    // Tunggu Firebase siap
-    await waitForFirebase();
-
-    // Hash key dengan SHA-256 sebelum dikirim ke Firestore
-    const hashedKey = await sha256(val);
-
-    // Cek ke koleksi 'access_keys' di Firestore
-    // Setiap dokumen: { hash: "<sha256-dari-key>", active: true }
-    const { getDocs, query: fsQuery, where, collection: fsCol } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const q = fsQuery(
-      fsCol(window._db, 'access_keys'),
-      where('hash', '==', hashedKey),
-      where('active', '==', true)
-    );
-    const snap = await getDocs(q);
-
-    if (!snap.empty) {
-      sessionStorage.setItem(SESSION_KEY, 'authenticated');
-      document.getElementById('login-overlay').classList.add('hidden');
-      errEl.classList.remove('show');
-    } else {
-      throw new Error('Key tidak valid');
-    }
-  } catch (err) {
-    errEl.textContent = 'Access key salah atau tidak aktif.';
-    errEl.classList.add('show');
-    input.classList.add('error-shake');
-    input.value = '';
-    input.focus();
-    setTimeout(() => input.classList.remove('error-shake'), 500);
-  } finally {
-    btnLogin.disabled = false;
-    btnLogin.textContent = 'Masuk';
-  }
-}
-
-// Tunggu Firebase siap (max 5 detik)
-function waitForFirebase() {
-  return new Promise((resolve, reject) => {
-    if (window._firebaseReady && window._db) return resolve();
-    let elapsed = 0;
-    const interval = setInterval(() => {
-      elapsed += 100;
-      if (window._firebaseReady && window._db) {
-        clearInterval(interval);
-        resolve();
-      } else if (elapsed > 5000) {
-        clearInterval(interval);
-        reject(new Error('Firebase timeout'));
-      }
-    }, 100);
-  });
-}
-
-// Hash SHA-256 (built-in browser API, tidak butuh library)
-async function sha256(message) {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Cek session saat halaman dimuat
-checkLoginSession();
-
+  document.getElementById('f-tgl') && (document.getElementById('f-tgl').valueAsDate = new Date());
+});
 </script>
 </body>
 </html>
